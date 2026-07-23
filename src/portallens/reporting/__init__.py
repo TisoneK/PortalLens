@@ -52,7 +52,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         lines.append("- No platform fingerprint could be derived from the supplied inputs.")
     inferred_relationships = [r for r in report.relationships if r.confidence >= 40]
     if inferred_relationships:
-        lines.append(f"- Inferred relationships (≥40% confidence): {len(inferred_relationships)}")
+        lines.append(f"- Inferred relationships (>=40% confidence): {len(inferred_relationships)}")
     else:
         lines.append("- No relationships met the 40% confidence threshold for inclusion in the summary.")
     if report.open_questions:
@@ -156,11 +156,11 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
     lines.append("| Range | Label | Meaning |")
     lines.append("|---|---|---|")
     for rng, lbl, meaning in [
-        ("0–19", ConfidenceLabel.VERY_LOW, "Speculative — no direct evidence; could easily be wrong."),
-        ("20–39", ConfidenceLabel.LOW, "Weak signal — one indirect indicator; treat as a hypothesis."),
-        ("40–59", ConfidenceLabel.MEDIUM, "Plausible — multiple indirect indicators or one strong one."),
-        ("60–79", ConfidenceLabel.HIGH, "Likely — strong, specific evidence; alternatives less probable."),
-        ("80–100", ConfidenceLabel.VERY_HIGH, "Established — direct, unambiguous evidence."),
+        ("0-19", ConfidenceLabel.VERY_LOW, "Speculative - no direct evidence; could easily be wrong."),
+        ("20-39", ConfidenceLabel.LOW, "Weak signal - one indirect indicator; treat as a hypothesis."),
+        ("40-59", ConfidenceLabel.MEDIUM, "Plausible - multiple indirect indicators or one strong one."),
+        ("60-79", ConfidenceLabel.HIGH, "Likely - strong, specific evidence; alternatives less probable."),
+        ("80-100", ConfidenceLabel.VERY_HIGH, "Established - direct, unambiguous evidence."),
     ]:
         lines.append(f"| {rng} | {lbl.value} | {meaning} |")
     lines.append("")
@@ -178,5 +178,5 @@ def _redact(value: str, *, keep: int = 64) -> str:
     """
 
     if len(value) > keep:
-        return value[:keep] + "…"
+        return value[:keep] + "..."
     return value
