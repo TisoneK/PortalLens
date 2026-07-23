@@ -33,3 +33,21 @@ block (and its "last verified" date) every time you run on it again.
   - Ephemeral — `.context/memory/secrets/` does NOT persist across sessions; treat the `GIT_TOKEN` env var as the primary secret store
   - No persistent home directory — all work must live under `/home/z/my-project/`
   - System Python may be `externally-managed` — always use a `.venv` for project installs
+
+---
+## Tisone's macOS workstation (last verified 2026-07-23)
+- **Identify by:** repo at `/Users/bao/Code/PortalLens`, Darwin 24.6.0 (macOS 15), local IDE agent (Claude Code), user's own git credentials
+- **OS:** macOS 15 (Darwin 24.6.0), arm64
+- **Runtimes:** system `python3` is **3.9.6** — below this project's `requires-python = ">=3.10"`, so it cannot run PortalLens. Use `/Users/bao/.local/bin/python3.12` (3.12.13). `uv` is also installed at `/Users/bao/.local/bin/uv`. No pyenv, no Homebrew Python on PATH.
+- **Package manager:** pip inside a project `.venv`
+- **Verified commands** (all run successfully on this machine, this project):
+  - `python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"` — creates the venv and installs dev deps
+  - `.venv/bin/python -m pytest -q` — 80 passed (session 2)
+  - `.venv/bin/ruff check .` — All checks passed
+  - `.venv/bin/mypy src` — Success, 16 source files
+  - `.venv/bin/portallens "<url>" "<url>"` — renders the Markdown report on stdout
+  - `git push origin main` — works with the user's existing credentials; no PAT involved (local agent)
+- **Quirks:**
+  - **Reach for `python3.12`, never bare `python3`** — the bare one is 3.9 and will fail on this project's syntax and typing.
+  - `.venv/` is gitignored; a fresh clone needs the venv step above before anything runs.
+  - `git worktree add <path> <sha>` works and is a clean way to render "before" output for a refactor diff. Remove it with `git worktree remove <path>` when done.

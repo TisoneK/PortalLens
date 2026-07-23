@@ -48,3 +48,27 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - The `AnalysisContext` carries generic inputs (URLs, HTML/HAR payloads, policy, notes) — not captive-portal-specific fields.
   - The `PortalReport` carries generic outputs (evidence, observations, fingerprints, relationships, open questions) — not captive-portal-specific fields.
   - Future agents adding a new portal type MUST register a `Portal` subclass via `@register_portal` and implement `analyze()`. They MUST NOT add portal-type-specific fields to `Portal`, `AnalysisContext`, or `PortalReport` — those go on the subclass.
+
+---
+## ADR-5: Provider knowledge is a registry, not code (2026-07-23)
+- **Status:** accepted
+- **Context:** The MVP (session 1) hardcoded ISPMan across four modules — an enum member, three module constants, a `_detect_ispman()` function, and six `== "ispman.tech"` comparisons in the relationship analyzer. Adding a second provider meant editing four files and duplicating the relationship reasoning per vendor. ADR-4 established that new *portal types* slot in without a rewrite; nothing established the same for new *providers within a type*.
+- **Decision:** Everything PortalLens knows about a captive-portal platform lives in `src/portallens/plugins/captive_wifi/signatures.py` as a `PortalSignature` record: the `SignatureRule`s that decide whether it fires, the weight each matched signal contributes, the display name, and the rule's provenance. The URL parser, the fingerprint scorer, and the relationship analyzer iterate that registry and name no vendor. `signatures.py` is the only module in the plugin that mentions a provider by name.
+- **Consequences:**
+  - Adding a provider is a registry entry. Verified by a test that registers a provider existing nowhere in the source tree and asserts the parser, scorer, and relationship analyzer all pick it up (`tests/test_signatures.py::TestRuntimeRegisteredProvider`).
+  - The registry distinguishes two layers: `SignatureLayer.GATEWAY` (software on the operator's own hardware, identified by the query variables it emits, owns no hostname) and `SignatureLayer.HOSTED_PLATFORM` (a third party running the portal for the operator, identified by its own host + path). This split is what makes `USES_PLATFORM` / `AUTHENTICATES_FOR` / `OPERATES_NETWORK` provider-agnostic — a host owned by any hosted platform is never the network operator.
+  - `CaptivePortalURLHints.flavors` holds slug **strings**, not enum members, so a registry entry needs no enum member. `CaptivePortalFlavor` remains as a convenience enum over the built-in slugs; it derives from `str`, so `CaptivePortalFlavor.MIKROTIK in hints.flavors` still works.
+  - Host suffix matching goes through `signatures.host_matches()`, which matches on label boundaries — `evilispman.tech` is not ISPMan. Future agents MUST NOT reintroduce a bare `endswith()` host check.
+  - Future agents adding provider support MUST add a registry entry. A new `_detect_<vendor>()` function, a new `CaptivePortalFlavor` member, or a vendor hostname compared in `relationship.py` or `analyzer.py` is a regression of this ADR.
+  - Confidence scores are unaffected: all four pre-existing detectors were expressible as declarative rules with their original weights, verified by diffing the rendered report against the pre-refactor commit.
+
+---
+## ADR-6: Signatures carry provenance; unvalidated ones say so in the report (2026-07-23)
+- **Status:** accepted
+- **Context:** Generalizing the registry (ADR-5) made adding providers cheap, which creates a new risk: signatures transcribed from vendor documentation can be added faster than they can be validated against real captured URLs. PortalLens's entire value proposition is calibrated, evidence-backed claims (ADR-2, ADR-3). A documentation-derived guess presented identically to a field-validated match would quietly undermine that.
+- **Decision:** Every `PortalSignature` records a `Provenance`: `VALIDATED` (a real captured URL matching it lives in this repo's `tests/data/`) or `DOCUMENTED` (transcribed from vendor documentation, never checked against a capture). A `DOCUMENTED` signature still fires and still scores normally, but its fingerprint note states its provenance and the analyzer adds an open question inviting the reader to treat the match as provisional.
+- **Consequences:**
+  - `MIKROTIK` and `ISPMAN` are `VALIDATED` (the session-1 fixture is a real capture). `COOVACHILLI`, `UNIFI`, and `MERAKI` are `DOCUMENTED`.
+  - The cost of adding a speculative signature is paid in the report's noise, which is the correct place for it to be visible.
+  - Future agents MUST default a new signature to `DOCUMENTED` and MUST NOT promote one to `VALIDATED` without adding the capture to `tests/data/` that justifies it.
+  - Future agents MUST NOT remove the provisional note or open question to tidy up report output. If the noise becomes a problem, the fix is to validate the signature or drop it — not to hide its status.

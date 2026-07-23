@@ -21,3 +21,30 @@ Friction caused by the `.context/` system or the protocol itself. See
 - **Root cause:** The `context-sync bootstrap` command's "next steps" output says "fill .context/kickoff.md Project Facts + AGENTS.md <PROJECT_NAME>" and "fill memory/..." but doesn't emphasize that these go in the SAME commit as the bootstrap.
 - **Suggested fix:** Add a line to the bootstrapper's "next steps" output: "Commit these together with the bootstrap as one `chore(context): bootstrap .context/` commit — do NOT push an empty-memory bootstrap." The universal-kickoff.md already says this in Step 1d, but the bootstrapper's stdout is what an agent actually reads.
 - **Status:** open
+
+---
+## 2026-07-23 — Claude Code / claude-opus-4-8 (Session 2)
+
+- **Flaw:** Three protocol rules give conflicting direction when the session's Target is free text that is *itself* an architectural change. Step 9 says "Free text — interpret the target; if ambiguous, ask once in chat before proceeding." The Findings-handling parameter says "flag architectural changes for explicit approval." But the Zero-Interruption Principle and Pitfall #30 both say not to stop and ask. This session's target — "The portal is centered to a specific provider" — was ambiguous (a statement about the analyzed portal, or about the codebase?) *and* implied an architectural change, so all three rules were live at once and pointed different ways.
+- **Symptom:** Real deliberation about whether to spend a turn asking or to proceed. Resolved by proceeding on the stronger reading and documenting the ambiguity prominently — in the review's "Target interpretation" section, in the session entry, and in the chat summary — so the user can redirect cheaply. But the protocol did not direct that choice; it was made in spite of the protocol, which the Session Lifecycle section says is a failure ("If you don't know what to do next, the protocol has failed").
+- **Root cause:** The three rules were written for different situations and never reconciled. "Flag architectural changes for approval" assumes the architectural change is something the agent *discovered*, not something the user *asked for*. A user-supplied target is already the user's authorization for the change it names — but the protocol doesn't say that anywhere, so the finding-handling rule appears to apply to it.
+- **Suggested fix:** Add to the Findings-handling parameter and to Step 10: "A Target the user supplied IS approval for the architectural change it describes — the flag-for-approval rule governs changes you discovered, not the one you were asked for." And to Step 9's free-text clause: "If a reading is well-supported by the code and the alternative describes work already shipped, take the supported reading, state the assumption in the report and chat summary, and keep the work additive so a different reading can be taken from the same base — don't spend a turn asking."
+- **Status:** open
+
+---
+## 2026-07-23 — Claude Code / claude-opus-4-8 (Session 2) (2)
+
+- **Flaw:** Step 3 says to set `.context/memory/tasks/current.md` "before starting work" and lists it as the last bullet of Step 3 — i.e. before Step 4 (install), Step 5 (read docs), Step 7 (discovery), and Step 8 (baseline). When the Target is free text, the task cannot be stated accurately until *after* that exploration: this session could not have written a useful `current.md` entry before reading the source, because the entry's content ("ISPMan is hardcoded across four modules") *was* the finding of Phase 1.
+- **Symptom:** `current.md` was written after Step 8 rather than at Step 3. The session lock — whose purpose is to stop a second agent starting concurrently — was therefore absent for the whole of Phase 1, the longest read-only stretch of the session.
+- **Root cause:** `current.md` serves two purposes that want different timings: it is a **lock** (wants to be set as early as possible, needs no detail) and a **task record** (wants detail, so needs Phase 1 done). The protocol treats them as one write.
+- **Suggested fix:** Split the write in the editions. At Step 3: "Claim the lock — write `current.md` with the session id and the raw Target verbatim, even if you can't yet describe the work." At the end of Step 8: "Refine `current.md` with what Phase 1 established about the task." One sentence each; makes the lock cover Phase 1, which is where a colliding agent does the most redundant work.
+- **Status:** open
+
+---
+## 2026-07-23 — Claude Code / claude-opus-4-8 (Session 2) (3)
+
+- **Flaw:** Pitfall #41 says "Don't write dates from memory — run `date -u +%F`." It doesn't cover the case where the agent's harness *supplies* a date in its context that disagrees with the command. Here the harness context stated 2026-07-22 while `date -u +%F` returned 2026-07-23 (the machine's local clock was late on 07-22; UTC had rolled over).
+- **Symptom:** Two plausible dates for an append-only entry, one of which would have made this session appear to precede session 1 (dated 2026-07-23) in a log whose whole value is chronological ordering. Resolved by following the command, which also matches the user's timezone (Africa/Nairobi, UTC+3, per `user/identity.md`), but the protocol only implies this rather than saying it.
+- **Root cause:** Pitfall #41 addresses the model fabricating a date. It doesn't anticipate a *harness-supplied* date, which doesn't feel like "from memory" and so doesn't obviously fall under the rule — while being just as capable of being stale or in a different timezone.
+- **Suggested fix:** Extend Pitfall #41: "This includes a date supplied by your harness or system context — it may be stale or in a different timezone than the repo's history. `date -u +%F` is the only authority. If the two disagree, use the command and note the discrepancy in your session entry so the next agent doesn't churn on it."
+- **Status:** open
