@@ -17,9 +17,9 @@ from urllib.parse import urlparse
 
 from portallens.evidence import Evidence, EvidenceType, Observation
 from portallens.plugins.captive_wifi.fingerprints import FingerprintMatch, detect_fingerprints
-from portallens.plugins.captive_wifi.relationship import infer_relationships
+from portallens.plugins.captive_wifi.relationship import BACKLINK_EVIDENCE_KEY, infer_relationships
+from portallens.plugins.captive_wifi.signatures import Provenance, signature_for_slug
 from portallens.plugins.captive_wifi.url_parser import (
-    CaptivePortalFlavor,
     CaptivePortalURLHints,
     parse_captive_url,
 )
@@ -63,7 +63,7 @@ class CaptiveWifiPortal(Portal):
         primary_hints: CaptivePortalURLHints | None = None
         for url in context.urls:
             hints = parse_captive_url(url)
-            if any(f != CaptivePortalFlavor.GENERIC for f in hints.flavors):
+            if not hints.is_generic:
                 primary_url = url
                 primary_hints = hints
                 break
@@ -203,34 +203,39 @@ class CaptiveWifiPortal(Portal):
                 )
             )
 
-        # If MikroTik link-login points at an external host, record it
-        # as redirect evidence. The link-login parameter on the external
-        # portal URL points BACK at the hotspot's login page — so the
-        # external portal's host is the redirect TARGET, and the
-        # link-login value's host is the redirect SOURCE.
-        if hints.mikrotik_link_login:
-            source_host_in_param = (urlparse(hints.mikrotik_link_login).hostname or "").lower()
-            own_host = hints.parsed.host.lower()
-            if source_host_in_param and source_host_in_param != own_host:
+        # A backlink parameter pointing at an external host is redirect
+        # evidence: it points BACK at the gateway that sent the client here,
+        # so this URL's host is the redirect TARGET and the parameter's host
+        # is the redirect SOURCE. Which parameters count is declared per
+        # signature (`backlink_params`) — a parameter naming the user's
+        # original destination (MikroTik's `link-orig`) is deliberately not
+        # one of them, since treating it as a redirect invents relationships
+        # to whatever site the client was loading when it got captured.
+        own_host = hints.parsed.host.lower()
+        for gateway in hints.gateways:
+            for key in sorted(gateway.backlink_params):
+                backlink_url = hints.parsed.param(key)
+                if not backlink_url:
+                    continue
+                source_host_in_param = (urlparse(backlink_url).hostname or "").lower()
+                if not source_host_in_param or source_host_in_param == own_host:
+                    continue
                 out.append(
                     Evidence(
                         type=EvidenceType.URL_REDIRECT,
                         source=source,
-                        key="link_login_target",
-                        value=hints.mikrotik_link_login,
+                        key=BACKLINK_EVIDENCE_KEY,
+                        value=backlink_url,
                         note=(
-                            f"link-login parameter on `{own_host}` points back at "
+                            f"`{key}` parameter on `{own_host}` points back at "
                             f"`{source_host_in_param}` — `{source_host_in_param}` "
                             f"redirects to `{own_host}`."
                         ),
                     )
                 )
-        # NOTE: We deliberately do NOT emit redirect evidence for
-        # link-orig. The link-orig parameter is the URL the user was
-        # originally trying to reach (e.g. Apple's captive probe
-        # http://www.msftconnecttest.com/redirect), not a portal redirect.
-        # Treating it as a portal redirect would produce false positives
-        # like "msftconnecttest.com redirects to captive.ispman.tech".
+                # One redirect record per gateway is enough; the additional
+                # backlink parameters carry the same host pair.
+                break
 
         return out
 
@@ -261,24 +266,38 @@ class CaptiveWifiPortal(Portal):
                 )
             )
 
-        from portallens.plugins.captive_wifi.url_parser import CaptivePortalFlavor
-
-        if CaptivePortalFlavor.MIKROTIK in hints.flavors:
-            mikrotik_evs = [
+        # One fact per gateway signature that fired — the query-string
+        # variables are directly observed, so confidence is 100.
+        for gateway in hints.gateways:
+            gateway_evs = [
                 e.id for e in evidence
                 if e.type is EvidenceType.URL_PARAMETER
                 and e.source == source
-                and e.key in {"link-login", "link-orig", "link-login-only", "dst", "mac", "ip"}
+                and e.key in gateway.param_weights
             ]
+            # Name only the parameters that actually carry the signature —
+            # the rest of the gateway's variable set (screen size, timezone,
+            # canvas fingerprint) is present but identifies nothing.
+            present = sorted(
+                {e.key for e in evidence
+                 if e.type is EvidenceType.URL_PARAMETER
+                 and e.source == source
+                 and e.key in gateway.param_weights}
+            )
             out.append(
                 Observation(
                     kind="fact",
-                    statement="URL carries the MikroTik RouterOS hotspot query-string signature (link-login / link-orig / dst / mac / ip).",
+                    statement=(
+                        f"URL carries the {gateway.platform} query-string signature "
+                        f"({' / '.join(present)})."
+                    ),
                     confidence=100,
-                    evidence_ids=mikrotik_evs,
+                    evidence_ids=gateway_evs,
                 )
             )
-        if CaptivePortalFlavor.ISPMAN in hints.flavors:
+
+        # …and one for the hosted platform serving the URL, if any.
+        if hints.platform is not None:
             host_path_evs = [
                 e.id for e in evidence
                 if e.type in {EvidenceType.URL_HOST, EvidenceType.URL_PATH}
@@ -287,7 +306,13 @@ class CaptiveWifiPortal(Portal):
             out.append(
                 Observation(
                     kind="fact",
-                    statement="URL host + path match the ISPMan captive-portal scheme (captive.ispman.tech/hotspots/.../select).",
+                    # The scheme, not the URL: restating the path here would
+                    # duplicate the evidence table and copy session
+                    # identifiers into a statement meant to be quotable.
+                    statement=(
+                        f"URL host + path match the {hints.platform.platform} "
+                        "captive-portal scheme."
+                    ),
                     confidence=100,
                     evidence_ids=host_path_evs,
                 )
@@ -399,24 +424,37 @@ class CaptiveWifiPortal(Portal):
             "assessment (DNS resolution + IP/ASN lookup)."
         )
 
-        # Is Maz a reseller, or an operator using a 3rd-party platform?
+        # Is the operator a reseller, or just a customer of the platform?
         resells = [r for r in relationships if r.kind.value == "resells_bandwidth"]
         if resells:
+            platform_name = hints.platform.platform if hints.platform else "the hosted portal platform"
             questions.append(
                 "Is the local operator a bandwidth reseller, or an operator using "
-                "ISPMan purely as a captive-portal platform? Resolving this requires "
-                "package-pricing evidence, the operator's own commercial disclosure, "
-                "or upstream ISP identification."
+                f"{platform_name} purely as a captive-portal platform? Resolving this "
+                "requires package-pricing evidence, the operator's own commercial "
+                "disclosure, or upstream ISP identification."
             )
 
-        # MikroTik admin exposure?
-        from portallens.plugins.captive_wifi.url_parser import CaptivePortalFlavor
-        if CaptivePortalFlavor.MIKROTIK in hints.flavors:
+        # Gateway admin exposure — one question per detected gateway, since
+        # each vendor exposes a different administrative surface.
+        for gateway in hints.gateways:
             questions.append(
-                "Is the MikroTik router's administrative interface exposed to the "
+                f"Is the {gateway.platform} administrative interface exposed to the "
                 "customer network? This is a common misconfiguration but cannot be "
                 "determined from URL evidence — it requires an authorized active "
                 "assessment (port scan + HTTP probe of likely admin paths)."
             )
+
+        # A signature that has never been checked against a captured URL is a
+        # claim the reader should be able to discount.
+        for fp in fingerprints:
+            signature = signature_for_slug(fp.slug) if fp.slug else None
+            if signature is not None and signature.provenance is not Provenance.VALIDATED:
+                questions.append(
+                    f"Does the {signature.platform} fingerprint hold in the field? Its "
+                    "signature was transcribed from vendor documentation and has not "
+                    "been validated against a captured URL in this project's fixtures — "
+                    "treat the match as provisional."
+                )
 
         return questions

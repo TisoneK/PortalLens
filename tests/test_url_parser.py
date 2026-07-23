@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from portallens.plugins.captive_wifi.signatures import SignatureLayer
 from portallens.plugins.captive_wifi.url_parser import (
     CaptivePortalFlavor,
     looks_like_captive_portal,
@@ -53,13 +54,19 @@ class TestIspmanUrl:
         hints = parse_captive_url(ISPMAN_URL)
         assert CaptivePortalFlavor.MIKROTIK in hints.flavors
 
-    def test_extracts_ispman_hotspot_ids(self) -> None:
+    def test_identifies_the_hosted_platform(self) -> None:
+        hints = parse_captive_url(ISPMAN_URL)
+        assert hints.platform is not None
+        assert hints.platform.slug == "ispman"
+        assert hints.platform.layer is SignatureLayer.HOSTED_PLATFORM
+
+    def test_extracts_platform_path_ids(self) -> None:
         hints = parse_captive_url(ISPMAN_URL)
         # The path is /hotspots/<id1>/<id2>/<id3>/<tier>/select — we
         # extract everything between /hotspots/ and /<tier>/select.
-        assert len(hints.ispman_hotspot_ids) == 3
-        assert hints.ispman_hotspot_ids[0] == "366ba450-bc93-4970-97d6-0585aa985a12"
-        assert hints.ispman_hotspot_ids[1] == "381168ce-bbb2-4f86-8fb8-d6d48321d8bb"
+        assert len(hints.platform_path_ids) == 3
+        assert hints.platform_path_ids[0] == "366ba450-bc93-4970-97d6-0585aa985a12"
+        assert hints.platform_path_ids[1] == "381168ce-bbb2-4f86-8fb8-d6d48321d8bb"
 
     def test_extracts_link_login_pointing_at_maz(self) -> None:
         hints = parse_captive_url(ISPMAN_URL)
