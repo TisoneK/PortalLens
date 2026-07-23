@@ -36,6 +36,7 @@ correction twice.
 
 - Plain-language commit messages; technical detail lives in the review report (stated, 2026-07-23)
 - When proposing system architecture, present multiple labelled scenarios (A/B/C…) and assign confidence percentages to inferences vs. observed facts — the user prefers calibrated, evidence-backed claims over single confident answers (approved pattern, 2026-07-23)
+- Ask when the *meaning* of a request is genuinely unclear; don't ask for go-ahead on work already prescribed. The user is explicit that "don't ask permission" targets rhetorical questions needing only a "yes" — it was never a bar on clarifying what was actually asked for. Do not treat the two as being in tension (correction, 2026-07-23)
 
 ## Code style
 
