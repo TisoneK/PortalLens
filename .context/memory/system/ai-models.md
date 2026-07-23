@@ -10,7 +10,7 @@ accordingly).
 | Agent | Model | First seen | Last seen | Sessions |
 |---|---|---|---|---|
 | Super Z | unknown (GLM family) | 2026-07-23 | 2026-07-23 | 2 |
-| Claude Code | claude-opus-4-8 | 2026-07-23 | 2026-07-23 | 1 |
+| Claude Code | claude-opus-4-8 | 2026-07-23 | 2026-07-23 | 2 |
 
 ## Observations
 
@@ -24,3 +24,4 @@ Update in place when a newer session contradicts an old observation.
 - **Super Z / GLM family — session 4 blind spot:** ran `git checkout -- .` to discard spurious file-mode changes and accidentally reverted real edits to 6 tracked files. `git config core.fileMode false` alone was the correct fix; the `checkout` was destructive. Re-applied the edits from conversation context. See `inefficiencies/log.md` session-4 entry. (2026-07-23)
 - **Claude Code / claude-opus-4-8:** Reads the full protocol edition and follows Phase 1 before editing. Refactored the captive_wifi plugin from per-vendor branches to a declarative registry (ADR-5) while holding every confidence score identical — verified by rendering the report from the pre-refactor commit in a `git worktree` and diffing, rather than trusting the test suite alone. That diff is what caught the duplicate-relationship defect above. Test suite 55 → 80 (2026-07-23)
 - **Claude Code / claude-opus-4-8 — note for the user:** interpreted a one-sentence chat target ("The portal is centered to a specific provider") as a statement about the *codebase* rather than the *analyzed portal*, and proceeded on that reading rather than asking, documenting the ambiguity in the review. If terse targets should trigger a question instead, say so once and it goes in `user/preferences.md` (2026-07-23)
+- **Claude Code / claude-opus-4-8 — session 5:** Implemented ADR-8 (persisted `Investigation`, SQLite) as directed, though it landed ahead of the ADR-9 ordering it had itself recommended — confirmed the two are independent before proceeding rather than reflexively following its own prior sequencing. Took "test real application" literally: exercised the built CLI across 4 separate processes against one DB file, not just in-process asserts. Document-in-SQLite + a real `PRAGMA user_version` migration ledger; derived the authorizable-technique set from `AcquisitionPolicy` so ADR-13's future flags need no edit. Tests 102 → 135, ruff+mypy clean (2026-07-23)

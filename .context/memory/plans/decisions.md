@@ -155,3 +155,18 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - `is_passive` currently means "no target-facing active technique." The OSINT tier needs its own place in that logic — touching third parties is not "passive" even though the target is untouched, so OSINT is neither `is_passive` nor target-facing-active; it is its own middle tier.
   - Each new technique picks the correct tier rather than piggy-backing on `fetch_urls` for convenience.
   - Future agents MUST NOT let `fetch_urls=True` silently enable OSINT calls or script execution.
+
+---
+## ADR-14: Investigation persistence is document-in-SQLite with a migration ledger (2026-07-23)
+- **Status:** accepted — realizes ADR-8 (which is now implemented in `portallens/investigation/`)
+- **Context:** ADR-8 committed to `Investigation` as a persisted core concept in SQLite, but left the storage shape open. The report aggregate (evidence, observations, relationships, open questions) is still evolving — structured `OpenQuestion` (ADR-9) and analysis steps are coming — so a fully-normalized relational schema for it now would be churned repeatedly. Yet DisclosureDesk will need real queries (by target, by disclosure state, by date), which a single opaque blob can't serve.
+- **Decision:**
+  - **Document-in-SQLite.** Each investigation is one row. The queryable facts — `id`, `target`, `portal_type`, `created_at`, `updated_at` — are promoted to their own indexed columns; the full aggregate is serialized as a JSON document (pydantic `model_dump_json`) in a `data` column. Promoted columns serve queries; JSON gives the aggregate room to evolve. When a new query need appears, a migration promotes another column — it does **not** trigger a rewrite into normalized tables.
+  - **Migration ledger from day one.** Schema version lives in SQLite's `PRAGMA user_version`. `_MIGRATIONS` is an ordered list; index *i* migrates to version *i+1*. On connect, every migration past the current version runs, so fresh and old databases converge. A shipped migration is **never edited** — the next change is an append. `SCHEMA_VERSION == len(_MIGRATIONS)`, pinned by a test.
+  - **Authorizable-technique set is derived, not hardcoded** — from `AcquisitionPolicy`'s boolean fields (`_active_techniques()`), so ADR-13's future tiers become valid authorization targets with no edit to the investigation code.
+  - **Id scheme:** target hostname slug + 6 hex chars (`captive-ispman-tech-1a2b3c`). Human-recognizable, derived from the real target (data, not a hardcoded example), unique across revisits.
+- **Consequences:**
+  - `PortalReport` stays the immutable snapshot; `Investigation` is the mutable persisted aggregate that owns it.
+  - Future agents MUST add schema changes as new entries in `_MIGRATIONS`, never by editing a shipped migration or hand-mutating a live DB.
+  - Promoting a column (e.g. `disclosure_state` for DisclosureDesk) is the sanctioned way to make a JSON field queryable — the ledger exists for exactly this.
+  - No new runtime dependency: `sqlite3` is stdlib. Persistence must stay dependency-free — do not swap in an ORM without a superseding ADR.
