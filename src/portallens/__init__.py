@@ -17,6 +17,7 @@ from portallens.confidence import Confidence, ConfidenceLabel, score
 from portallens.evidence import Evidence, EvidenceType, Observation
 from portallens.portal import (
     AnalysisContext,
+    OpenQuestion,
     Portal,
     PortalFingerprint,
     PortalRelationship,
@@ -35,6 +36,7 @@ __all__ = [
     "Evidence",
     "EvidenceType",
     "Observation",
+    "OpenQuestion",
     "Portal",
     "PortalFingerprint",
     "PortalRelationship",

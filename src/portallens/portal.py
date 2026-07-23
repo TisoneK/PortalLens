@@ -135,6 +135,37 @@ class PortalRelationship(BaseModel):
     note: str | None = None
 
 
+class OpenQuestion(BaseModel):
+    """A gap the analyzer could not close, expressed as structured data.
+
+    Before this, open questions were bare strings — prose at the bottom of a
+    report. That made "what would resolve this?" a sentence a human had to
+    write consistently, and made a graph view unable to lay the gap out.
+
+    Now:
+
+    - ``subject`` is the entity the question is about (a host, a platform).
+    - ``question`` is the human-readable prompt.
+    - ``kind`` is the relationship edge that would be established if the
+      question were answered. Set it when the question maps to a specific
+      missing relationship (``UPSTREAM_OF``, ``RESELLS_BANDWIDTH``, …) so a
+      graph view can draw an explicit *unknown* edge rather than burying the
+      gap in prose; leave it ``None`` for questions that refine an existing
+      node rather than proposing an edge.
+    - ``resolves_with`` names the analysis steps — by slug — that could answer
+      the question. This is the basis for a *computed* "next investigation"
+      queue (ADR-9): match a report's open questions against the registered
+      steps that can answer them. An empty list means no automated step can
+      resolve it (it needs manual field capture). The slugs are plain strings
+      for now; the ``AnalysisStep`` registry that owns them is a later slice.
+    """
+
+    subject: str
+    question: str
+    kind: RelationshipKind | None = None
+    resolves_with: list[str] = Field(default_factory=list)
+
+
 class PortalReport(BaseModel):
     """The full output of a :class:`Portal.analyze` call.
 
@@ -154,7 +185,7 @@ class PortalReport(BaseModel):
     observations: list[Observation] = Field(default_factory=list)
     fingerprints: list[PortalFingerprint] = Field(default_factory=list)
     relationships: list[PortalRelationship] = Field(default_factory=list)
-    open_questions: list[str] = Field(default_factory=list)
+    open_questions: list[OpenQuestion] = Field(default_factory=list)
 
     def evidence_by_id(self, evidence_id: str) -> Evidence | None:
         for ev in self.evidence:

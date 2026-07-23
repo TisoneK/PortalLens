@@ -25,12 +25,24 @@ from portallens.plugins.captive_wifi.url_parser import (
 )
 from portallens.portal import (
     AnalysisContext,
+    OpenQuestion,
     Portal,
     PortalFingerprint,
     PortalRelationship,
     PortalReport,
     PortalType,
+    RelationshipKind,
 )
+
+# Analysis-step slugs a question can be resolved by (ADR-9). These are plain
+# strings until the AnalysisStep registry (a later slice) owns them; `resolve_dns`,
+# `probe_tls`, and `port_scan` already correspond to AcquisitionPolicy techniques,
+# `ip_asn_lookup` and `capture_html` to backlogged steps.
+_STEP_RESOLVE_DNS = "resolve_dns"
+_STEP_IP_ASN = "ip_asn_lookup"
+_STEP_PROBE_TLS = "probe_tls"
+_STEP_PORT_SCAN = "port_scan"
+_STEP_CAPTURE_HTML = "capture_html"
 
 
 class CaptiveWifiPortal(Portal):
@@ -50,7 +62,7 @@ class CaptiveWifiPortal(Portal):
 
         evidence: list[Evidence] = []
         observations: list[Observation] = []
-        open_questions: list[str] = []
+        open_questions: list[OpenQuestion] = []
 
         # ------------------------------------------------------------------
         # 1. Capture evidence from every supplied URL.
@@ -401,60 +413,103 @@ class CaptiveWifiPortal(Portal):
         hints: CaptivePortalURLHints,
         fingerprints: list[FingerprintMatch],
         relationships: list[PortalRelationship],
-    ) -> list[str]:
-        """Open questions — gaps the evidence can't close."""
+    ) -> list[OpenQuestion]:
+        """Open questions — gaps the evidence can't close, as structured records.
 
-        questions: list[str] = []
+        Each carries the entity it's about, the relationship edge it would
+        establish (when it maps to one), and the analysis steps that could
+        answer it — so a graph view can draw the gap and a "next investigation"
+        queue can be computed from it (ADR-9).
+        """
 
-        # Who operates the underlying Wi-Fi network?
-        operates = [r for r in relationships if r.kind.value == "operates_network"]
+        questions: list[OpenQuestion] = []
+
+        # Who operates the underlying Wi-Fi network? Refines an existing node
+        # (the operator host), so no edge kind.
+        operates = [r for r in relationships if r.kind is RelationshipKind.OPERATES_NETWORK]
         if operates:
+            operator = operates[0].other
             questions.append(
-                f"Who is the legal / commercial entity behind `{operates[0].other}`? "
-                "The URL identifies a local captive hostname, not an organization. "
-                "Resolving this requires DNS records, TLS certificate inspection, or "
-                "direct operator disclosure."
+                OpenQuestion(
+                    subject=operator,
+                    question=(
+                        f"Who is the legal / commercial entity behind `{operator}`? "
+                        "The URL identifies a local captive hostname, not an organization. "
+                        "Resolving this requires DNS records, TLS certificate inspection, or "
+                        "direct operator disclosure."
+                    ),
+                    resolves_with=[_STEP_RESOLVE_DNS, _STEP_PROBE_TLS],
+                )
             )
 
-        # Who is the upstream ISP?
+        # Who is the upstream ISP? This is the canonical unknown *edge*
+        # (UPSTREAM_OF) — the one a graph view draws as an explicit gap.
+        operator_subject = operates[0].other if operates else hints.parsed.host
         questions.append(
-            "Who is the upstream Internet bandwidth provider? "
-            "PortalLens cannot identify this from URL evidence alone — it requires "
-            "IP/ASN ownership data, which is gated behind an authorized active "
-            "assessment (DNS resolution + IP/ASN lookup)."
+            OpenQuestion(
+                subject=operator_subject,
+                question=(
+                    "Who is the upstream Internet bandwidth provider? "
+                    "PortalLens cannot identify this from URL evidence alone — it requires "
+                    "IP/ASN ownership data, which is gated behind an authorized active "
+                    "assessment (DNS resolution + IP/ASN lookup)."
+                ),
+                kind=RelationshipKind.UPSTREAM_OF,
+                resolves_with=[_STEP_RESOLVE_DNS, _STEP_IP_ASN],
+            )
         )
 
         # Is the operator a reseller, or just a customer of the platform?
-        resells = [r for r in relationships if r.kind.value == "resells_bandwidth"]
+        resells = [r for r in relationships if r.kind is RelationshipKind.RESELLS_BANDWIDTH]
         if resells:
             platform_name = hints.platform.platform if hints.platform else "the hosted portal platform"
             questions.append(
-                "Is the local operator a bandwidth reseller, or an operator using "
-                f"{platform_name} purely as a captive-portal platform? Resolving this "
-                "requires package-pricing evidence, the operator's own commercial "
-                "disclosure, or upstream ISP identification."
+                OpenQuestion(
+                    subject=operator_subject,
+                    question=(
+                        "Is the local operator a bandwidth reseller, or an operator using "
+                        f"{platform_name} purely as a captive-portal platform? Resolving this "
+                        "requires package-pricing evidence, the operator's own commercial "
+                        "disclosure, or upstream ISP identification."
+                    ),
+                    kind=RelationshipKind.RESELLS_BANDWIDTH,
+                    resolves_with=[_STEP_IP_ASN],
+                )
             )
 
         # Gateway admin exposure — one question per detected gateway, since
         # each vendor exposes a different administrative surface.
         for gateway in hints.gateways:
             questions.append(
-                f"Is the {gateway.platform} administrative interface exposed to the "
-                "customer network? This is a common misconfiguration but cannot be "
-                "determined from URL evidence — it requires an authorized active "
-                "assessment (port scan + HTTP probe of likely admin paths)."
+                OpenQuestion(
+                    subject=gateway.platform,
+                    question=(
+                        f"Is the {gateway.platform} administrative interface exposed to the "
+                        "customer network? This is a common misconfiguration but cannot be "
+                        "determined from URL evidence — it requires an authorized active "
+                        "assessment (port scan + HTTP probe of likely admin paths)."
+                    ),
+                    resolves_with=[_STEP_PORT_SCAN, _STEP_CAPTURE_HTML],
+                )
             )
 
         # A signature that has never been checked against a captured URL is a
-        # claim the reader should be able to discount.
+        # claim the reader should be able to discount. No automated step
+        # resolves this — it needs a real captured URL in the fixtures — so
+        # resolves_with is deliberately empty.
         for fp in fingerprints:
             signature = signature_for_slug(fp.slug) if fp.slug else None
             if signature is not None and signature.provenance is not Provenance.VALIDATED:
                 questions.append(
-                    f"Does the {signature.platform} fingerprint hold in the field? Its "
-                    "signature was transcribed from vendor documentation and has not "
-                    "been validated against a captured URL in this project's fixtures — "
-                    "treat the match as provisional."
+                    OpenQuestion(
+                        subject=signature.platform,
+                        question=(
+                            f"Does the {signature.platform} fingerprint hold in the field? Its "
+                            "signature was transcribed from vendor documentation and has not "
+                            "been validated against a captured URL in this project's fixtures — "
+                            "treat the match as provisional."
+                        ),
+                    )
                 )
 
         return questions

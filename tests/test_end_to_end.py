@@ -62,7 +62,28 @@ class TestEndToEnd:
         assert report.open_questions
         # The upstream-ISP question is mandatory — it's always open
         # without authorized active assessment.
-        assert any("upstream" in q.lower() for q in report.open_questions)
+        assert any("upstream" in q.question.lower() for q in report.open_questions)
+
+    def test_upstream_question_is_a_structured_unknown_edge(self) -> None:
+        # The upstream-ISP question maps to an UPSTREAM_OF edge and names the
+        # steps that could resolve it (ADR-9) — this is what lets a graph view
+        # draw it as an explicit unknown edge and a "next investigation" queue
+        # be computed.
+        portal = CaptiveWifiPortal()
+        report = portal.analyze(AnalysisContext(urls=[ISPMAN_URL, MAZ_URL]))
+        upstream = next(q for q in report.open_questions if "upstream" in q.question.lower())
+        assert upstream.kind is RelationshipKind.UPSTREAM_OF
+        assert upstream.subject  # names the entity the gap is about
+        assert "ip_asn_lookup" in upstream.resolves_with
+
+    def test_gateway_admin_question_names_resolving_steps(self) -> None:
+        # The MikroTik gateway fires on the fixture, so there's an admin-exposure
+        # question — and it names the active steps that would answer it.
+        portal = CaptiveWifiPortal()
+        report = portal.analyze(AnalysisContext(urls=[ISPMAN_URL, MAZ_URL]))
+        admin = [q for q in report.open_questions if "administrative interface" in q.question]
+        assert admin
+        assert all("port_scan" in q.resolves_with for q in admin)
 
     def test_markdown_render_includes_all_sections(self) -> None:
         portal = CaptiveWifiPortal()

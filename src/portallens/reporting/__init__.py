@@ -137,7 +137,9 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         )
         lines.append("")
         for q in report.open_questions:
-            lines.append(f"- {q}")
+            lines.append(f"- {q.question}")
+            if q.resolves_with:
+                lines.append(f"  - Resolves with: {', '.join(q.resolves_with)}")
         lines.append("")
 
     # Footer — confidence rubric

@@ -21,6 +21,7 @@ ADR-7 binding rules these widgets respect:
 
 from __future__ import annotations
 
+from rich.markup import escape
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
@@ -318,9 +319,11 @@ class RelationshipView(Horizontal):
 class OpenQuestionsPanel(_ReportText):
     """The open questions — gaps the evidence can't close.
 
-    Rendered as a plain bulleted list. These are the prompts for
-    follow-up; the TUI doesn't (yet) wire them to actions because the
-    analysis-step registry (ADR-9) isn't implemented.
+    Each question now carries the analysis steps that could resolve it
+    (ADR-9's structured ``OpenQuestion``), shown here as a ``next:`` hint.
+    The TUI doesn't yet *run* those steps — the analysis-step registry is a
+    later slice — but the hint is the seam a future "next investigation"
+    action will hang off.
     """
 
     def _build_text(self) -> Text:
@@ -336,7 +339,12 @@ class OpenQuestionsPanel(_ReportText):
         )
         lines.append("")
         for q in r.open_questions:
-            lines.append(f"  • {q}")
+            # Escape the question text — it may contain characters Rich would
+            # otherwise parse as markup. (The badge-escaping lesson from the
+            # session-4 TUI work.)
+            lines.append(f"  • {escape(q.question)}")
+            if q.resolves_with:
+                lines.append(f"    [dim]next: {escape(', '.join(q.resolves_with))}[/dim]")
         return Text.from_markup("\n".join(lines))
 
 

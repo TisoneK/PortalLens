@@ -195,6 +195,18 @@ class TestSecondProvider:
         operates = [r for r in rels if r.kind is RelationshipKind.OPERATES_NETWORK]
         assert all("network-auth.com" not in r.other for r in operates)
 
+    def test_provisional_signature_raises_a_question_with_no_resolving_step(self) -> None:
+        # Meraki is a DOCUMENTED-provenance signature, so analyzing a Meraki URL
+        # emits a provisional-fingerprint open question. No automated step can
+        # validate a signature (it needs a real captured URL), so resolves_with
+        # is deliberately empty (ADR-9) — distinct from the upstream/admin
+        # questions, which do name steps.
+        report = CaptiveWifiPortal().analyze(AnalysisContext(urls=[MERAKI_URL, LOCAL_GATEWAY_URL]))
+        provisional = [q for q in report.open_questions if "hold in the field" in q.question]
+        assert provisional, "expected a provisional-signature question for the documented Meraki match"
+        assert all(q.resolves_with == [] for q in provisional)
+        assert any("Meraki" in q.subject for q in provisional)
+
 
 class TestNoDuplicateRelationships:
     """Regression: the pre-registry analyzer emitted USES_PLATFORM and
