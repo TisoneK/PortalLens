@@ -58,3 +58,12 @@ Friction caused by the `.context/` system or the protocol itself. See
 - **What this session should have done:** this target ("The portal is centered to a specific provider") was genuinely ambiguous, so Step 9 applied and asking would have been legitimate — no rule stood in the way. Proceeding on the well-supported reading also turned out to be what the user wanted, but that was the right call on its merits, not a rule conflict resolved under duress.
 - **Lesson for the next agent:** before logging a protocol conflict, re-read both rules in full — including their closing qualifiers. `flaws/` flows upstream to the package (core 0.3.0 `context-sync harvest`), so a misread rule becomes a proposed change to every project on the protocol. Cost of a wrong flaw entry is paid fleet-wide, not locally.
 - **Status:** this correction closes the Step 9 / Pitfall #30 claim in entry (1) as **invalid — do not harvest**. The Findings-handling point remains open.
+
+---
+## 2026-07-23 — GitHub Copilot (Session 6)
+
+- **Flaw:** `context-sync verify` fails on Windows Git Bash because `sha256sum` reads MANIFEST.sha256 with CRLF line endings, causing file paths in the manifest to carry a trailing `\r` (shown as `$'\r'`), so they never match actual on-disk filenames. `context-sync rollback` works correctly (it restores from git history and updates `core.lock`), but the subsequent `verify` always fails on Windows regardless of actual core integrity.
+- **Symptom:** Every `context-sync verify` invocation on Windows reports "CORE INTEGRITY FAILURE" even though the core was just rolled back from a known-good git commit. The agent cannot confirm core integrity using the vendored tool, which blocks the protocol step that says "verify cleanly or rollback and log."
+- **Root cause:** `context-sync` was authored for POSIX systems (macOS/Linux) where `sha256sum` expects LF-delimited input. On Windows, Git's `core.autocrlf` converts the manifest to CRLF, and `sha256sum` includes the `\r` in the file path, making lookup fail. The script uses `set -u` and `$(sha_cmd) --check --status MANIFEST.sha256` with no CRLF sanitization.
+- **Suggested fix:** Add CRLF normalization in `context-sync verify` — run `sed -i 's/\r$//' "$CORE_DIR/MANIFEST.sha256"` (or a portable equivalent) before invoking `sha256sum`, or document in the protocol editions that on Windows the agent should use Python to verify checksums when the shell script fails due to CRLF. The `rollback` and `lock` commands work fine; only `verify` is affected.
+- **Status:** open
