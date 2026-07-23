@@ -144,6 +144,10 @@ The analyzer populates `PortalReport.open_questions` for anything it couldn't cl
 3. Is the administrative interface of each detected gateway exposed to the customer network?
 4. Does each fingerprint whose signature has never been validated in the field actually hold?
 
+Each is a structured **`OpenQuestion`** (ADR-9), not a bare string: `subject` (the entity the gap is about), `question` (the prose), an optional relationship `kind` (the edge that would be established if answered — question 2 carries `UPSTREAM_OF`, so a graph view can draw it as an explicit *unknown* edge instead of a footnote), and `resolves_with` — the analysis-step slugs that could answer it (`resolve_dns`, `ip_asn_lookup`, `probe_tls`, `port_scan`, `capture_html`). Question 4 deliberately names **no** step: a documented-only signature can only be validated by capturing a real portal in the field, and the empty `resolves_with` says exactly that.
+
+`resolves_with` is the seam for a *computed* "next investigation" queue: match a report's open questions against the registered `AnalysisStep`s that can answer them. The slugs are plain strings today; the step registry that owns them (and turns the queue into runnable actions) is the next slice of ADR-9.
+
 These are the prompts for follow-up — either with more user input (HTML captures, DNS records) or an explicitly authorized active assessment.
 
 ## Future surfaces
