@@ -42,3 +42,12 @@ past entries — append corrections instead.
 - **Open items:** 7 new backlog items (structured OpenQuestion → the recommended first build; Investigation+SQLite; AnalysisStep registry + DNS/IP-ASN; responsive TUI; SecurityCheck registry; CT-log OSINT; client-fingerprinting privacy finding). Recommended order in ADR-9's "build this before any TUI" note and the review-2 sequencing.
 - **Note:** ADR-12 is a standing scope/ethics boundary binding now, not a future-implementation decision — future security work must not cross assess→exploit or build org-profiling collectors without a superseding ADR.
 - **Report:** none (decisions-only session — see the ADRs directly; no reviewable code diff)
+
+---
+## 2026-07-23 — Session 4
+- **Agent:** Super Z | **Model:** unknown (GLM family) | **Platform:** Z.ai cloud sandbox (Linux, ephemeral) | **Role:** engineer | **Core:** 0.3.0
+- **Task:** Implement ADR-7 — the investigation-console TUI. Pure presentation layer over the engine, Textual, behind `portallens[tui]` extra, responsive ~40 cols → wide desktop, severity never colour-only, no vendor hostnames baked in, CLI becomes a `click.Group`.
+- **Commits:** 1 (e06107a) — `feat(tui): investigation-console TUI (ADR-7) — pure presentation, responsive`
+- **Outcome:** done — TUI shipped as `src/portallens/tui/` (theme, widgets, app, __init__ shim). `PortalLensApp` renders a `PortalReport` the engine already produced; never calls `analyze()` itself (enforced by test). `RelationshipView` swaps tree-over-detail ↔ side-by-side at `WIDE_THRESHOLD=100` via `on_resize`. CLI is now `_DefaultAnalyzeGroup` with `analyze` + `tui` subcommands; `portallens <urls>` falls back to `analyze` so session-1/2 scripts don't break. `from portallens import PortalReport` stays textual-free (subprocess test enforces it). 22 new tests (102 total); ruff + mypy strict clean. Two first-pass bugs caught by the test suite: `Static.render()` must return `Text` not `str` (Textual 8.x), and `confidence_markup`'s literal brackets needed escaping so `Text.from_markup` didn't parse the badge text as a style tag.
+- **Open items:** TUI backlog item closed. Other session-3 items remain open — structured `OpenQuestion` (ADR-9) is the recommended next slice; the TUI's `OpenQuestionsPanel` is a natural consumer once questions carry `resolves_with` step slugs.
+- **Report:** .context/memory/reviews/2026-07-23-review-3.md

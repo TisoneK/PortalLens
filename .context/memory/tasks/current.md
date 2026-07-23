@@ -6,5 +6,5 @@ you find a stale in-progress entry here, a prior session died mid-task —
 check its session entry and backlog before starting.
 
 - **Session:** —
-- **Task:** none — no session in progress. Last completed: Session 3 (2026-07-23) — ADR-7..13 for the investigation-console + advanced-security direction; see `../plans/decisions.md` and the 7 new items in `../tasks/backlog.md`. Recommended first build: structured `OpenQuestion` (ADR-9).
+- **Task:** none — no session in progress. Last completed: Session 4 (2026-07-23) — ADR-7 TUI implemented (Textual, responsive, optional extra, pure presentation); see `../reviews/2026-07-23-review-3.md`. TUI backlog item closed. Recommended next: structured `OpenQuestion` (ADR-9) — the TUI's `OpenQuestionsPanel` is its natural consumer.
 - **Status:** idle

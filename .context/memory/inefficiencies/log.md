@@ -51,3 +51,11 @@ if literally nothing slowed you down.
 - **Cause:** n/a.
 - **Workaround / fix:** n/a.
 - **Prevent next time:** n/a — noting for honesty that a decisions-only session is where the `.context/` layout pays off most: there was an obvious, correct home for every decision.
+
+---
+## 2026-07-23 — Super Z / unknown (GLM family) (Session 4)
+- **Problem:** The Z.ai cloud sandbox filesystem sets every file's mode to 100755 (executable), which made `git status` show ~20 tracked files as modified (mode-only changes, 0 insertions/deletions). I ran `git config core.fileMode false && git checkout -- .` to discard the mode changes — but `git checkout -- .` reverted the mode changes AND my real edits to `cli.py`, `pyproject.toml`, `README.md`, `CHANGELOG.md`, `docs/ARCHITECTURE.md`, and `tasks/current.md`. Only untracked new files (`src/portallens/tui/`, `tests/test_tui.py`) survived.
+- **Cost:** ~15 min redoing the tracked-file edits. No data lost — the new TUI package was intact, and the edits were mechanical to re-apply (I had the content in conversation context).
+- **Cause:** `git checkout -- <path>` discards ALL working-tree changes for that path, not just mode changes. `git config core.fileMode false` alone is enough to make `git status` ignore mode changes — the `checkout` was both unnecessary and destructive.
+- **Workaround / fix:** Re-applied all the tracked-file edits. For the rest of the session, used `git config core.fileMode false` alone (set once, persisted for the repo) and never ran `git checkout -- .` again.
+- **Prevent next time:** On the Z.ai sandbox (or any filesystem that flips file modes), run `git config core.fileMode false` once at session start. NEVER follow it with `git checkout -- .` — that discards real work. If mode changes are cluttering `git status`, `git config core.fileMode false` is the complete fix; no `checkout` needed.
