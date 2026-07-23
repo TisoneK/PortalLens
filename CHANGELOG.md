@@ -9,6 +9,11 @@ public-facing changelog — plain language only.
 
 ## [Unreleased]
 
+### Added
+
+- **Investigation-console TUI.** `portallens tui <urls>...` runs the same analysis as `portallens analyze` and opens an interactive terminal UI: a relationship tree (the one screen that beats Markdown), confidence-badged observations, the evidence list, and open questions — all in one scrollable view. The TUI is an optional extra (`pip install -e ".[tui]"`); the library and CLI keep their original dependency set if you don't install it. It works from ~40 columns (Termux, portrait) to wide desktop — panels stack on narrow terminals and sit side-by-side on wide ones. Severity and status are never colour-only; every confidence badge carries its label alongside its percentage.
+- **CLI is now a command group.** `portallens analyze <urls>` (Markdown to stdout) and `portallens tui <urls>` (interactive console) are explicit subcommands. Passing URLs directly (`portallens <urls>`) still works — it routes to `analyze`, so existing scripts don't break.
+
 ### Changed
 
 - **PortalLens is no longer built around a single portal provider.** Everything it knows about a platform — how to spot it, and how much each clue is worth — now lives in one place, so recognising a new provider is a matter of describing it rather than rewriting the analyzer. Reports on the portals PortalLens already understood are unchanged.

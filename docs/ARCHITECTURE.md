@@ -151,10 +151,47 @@ These are the prompts for follow-up — either with more user input (HTML captur
 The PortalLens design conversation identified three components:
 
 - **PortalLens** — passive portal intelligence. *(Implemented here.)*
+- **Investigation-console TUI** — interactive presentation layer. *(Implemented — see "TUI" below.)*
 - **NetAudit** — authorized active security assessment. *(Planned — separate `audit` module behind `AcquisitionPolicy` flags.)*
 - **DisclosureDesk** — responsible disclosure report generation + tracking. *(Planned — extends `reporting/` with SARIF + disclosure-tracking output.)*
 
 The `Portal` abstraction is broad enough that NetAudit can be implemented as another plugin (`PortalType.CAPTIVE_WIFI` analyzer with active policy enabled), rather than a separate product. DisclosureDesk is a reporting concern, not an analysis concern — it lives alongside `render_markdown` in `reporting/`.
+
+## TUI (ADR-7)
+
+The investigation-console TUI is a **pure presentation layer**. It receives a fully-analyzed `PortalReport` and renders it — it contains no acquisition, fingerprinting, or inference logic. The engine (`CaptiveWifiPortal.analyze()`) runs before the TUI starts; the TUI never calls `analyze()` itself.
+
+### Layout
+
+```
+┌─────────────────────────────────────────────┐
+│ Header: primary URL, portal type, headline  │
+├─────────────────────────────────────────────┤
+│ Body (scrollable):                          │
+│   • Platform Fingerprints panel             │
+│   • Observations panel (facts → inferences  │
+│     → hypotheses, in that order)            │
+│   • Relationship view:                      │
+│       - Tree (always indented/linear)       │
+│       - Detail pane (selected relationship) │
+│   • Evidence panel                          │
+│   • Open Questions panel                    │
+└─────────────────────────────────────────────┘
+```
+
+The relationship view is the one screen that genuinely beats Markdown: a tree of relationships grouped by kind, with a detail pane that shows the full note + evidence ids when you select a node. On a wide terminal the tree and detail sit side by side; below `WIDE_THRESHOLD` (100 cols) they stack vertically. The tree itself is **always** the indented form — we never attempt to draw a wide node diagram, which is the failure mode ADR-7 rules out ("the design mockups overflowed their own borders").
+
+### Binding rules (ADR-7)
+
+- **Optional extra.** The TUI lives behind `portallens[tui]`. A script doing `from portallens import PortalReport` never pulls Textual — `portallens.tui` is imported lazily, inside the CLI's `tui` subcommand only. A test (`test_core_import_does_not_load_textual`) enforces this in a clean subprocess.
+- **Responsive.** `WIDE_THRESHOLD = 100` is the single width threshold. Below it, the relationship view gets a `narrow` class that stacks tree-over-detail; at or above, they sit side-by-side. The swap is driven by `on_resize`, never assumed.
+- **Severity never colour-only.** Every confidence badge carries its label text (`low · 35%`) alongside its percentage; colour wraps the badge but never replaces the words. A monochrome terminal (Termux included) sees the same information as a colour one.
+- **No vendor hostnames baked in.** `maz.wifi` and `captive.ispman.tech` never appear as executable string literals in `tui/` — they come from the report's evidence. A test (`test_no_vendor_literals_in_tui_source`) scans the AST to enforce this, skipping docstrings/comments that legitimately reference vendor names as examples.
+- **Plugin vertical slice preserved.** `tui/` is a sibling cross-cutting layer, not a reorganization of the analyzers. `plugins/<type>/` is unchanged.
+
+### CLI shape
+
+`cli.py` is a `click.Group` with two subcommands: `analyze` (Markdown to stdout) and `tui` (interactive console). A custom `Group` (`_DefaultAnalyzeGroup`) falls back to `analyze` when the first positional arg isn't a known subcommand — so `portallens <urls>` still works, preserving the pre-TUI invocation form that session-1 / session-2 scripts may depend on. Both subcommands share `_run_analysis()`, so the active-analysis contract (ADR-1) is identical whether you print Markdown or open the TUI.
 
 ## Why the design is the way it is
 

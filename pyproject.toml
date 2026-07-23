@@ -37,6 +37,11 @@ dev = [
   "pytest-cov>=5.0",
   "ruff>=0.5",
   "mypy>=1.10",
+  "textual>=0.47",
+  "pytest-asyncio>=0.23",
+]
+tui = [
+  "textual>=0.47",
 ]
 
 [project.scripts]
@@ -55,6 +60,7 @@ include = ["src/portallens", "tests", "README.md", "LICENSE", "pyproject.toml"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
 markers = [
   "network: tests that hit the network (skipped by default; run with -m network)",
 ]

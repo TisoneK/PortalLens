@@ -22,8 +22,18 @@ Alpha — captive Wi-Fi passive analysis is implemented and tested against a rea
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]"      # library + CLI + dev tools (includes the TUI extra)
+# or, for just the library + CLI:
+pip install -e .
+# or, for the TUI only:
+pip install -e ".[tui]"
 ```
+
+The TUI is an optional extra (ADR-7): `pip install -e ".[tui]"` pulls Textual.
+Without it, `portallens analyze <urls>` works but `portallens tui <urls>`
+prints a clear install hint. A script doing
+`from portallens import PortalReport` never pulls Textual — the TUI is
+lazy-imported inside the `tui` subcommand only.
 
 ## Usage
 
@@ -31,6 +41,16 @@ pip install -e ".[dev]"
 
 ```bash
 portallens "http://maz.wifi/login?dst=http%3A%2F%2Fwww.msftconnecttest.com%2Fredirect"
+```
+
+The CLI is a `click.Group` with two subcommands — `analyze` (prints
+Markdown) and `tui` (opens the investigation console). Passing URLs
+directly routes to `analyze`, preserving the pre-TUI invocation form:
+
+```bash
+portallens analyze "http://maz.wifi/login?dst=..."     # explicit
+portallens "http://maz.wifi/login?dst=..."             # default-subcommand fallback
+portallens tui "http://maz.wifi/login?dst=..."         # opens the TUI
 ```
 
 ### Passive analysis with multiple URLs
@@ -42,6 +62,21 @@ portallens \
     "http://maz.wifi/login?dst=..." \
     "https://captive.ispman.tech/hotspots/.../select?..."
 ```
+
+### Investigation-console TUI (ADR-7)
+
+```bash
+portallens tui \
+    "http://maz.wifi/login?dst=..." \
+    "https://captive.ispman.tech/hotspots/.../select?..."
+```
+
+The TUI is a pure presentation layer — it renders a `PortalReport` the
+engine already produced and contains no analysis logic. It is
+**responsive from ~40 columns (Termux, portrait) to wide desktop**: the
+relationship view stacks tree-over-detail on narrow terminals and sits
+side-by-side on wide ones. Severity and status are never colour-only —
+every confidence badge carries its label text alongside its percentage.
 
 ### Library use
 
@@ -56,6 +91,14 @@ report = portal.analyze(AnalysisContext(urls=[
     "https://captive.ispman.tech/hotspots/.../select?...",
 ]))
 print(render_markdown(report))
+```
+
+The TUI is equally usable as a library (requires the `[tui]` extra):
+
+```python
+from portallens.tui import PortalLensApp
+app = PortalLensApp(report)
+app.run()
 ```
 
 ### Active analysis (requires explicit authorization)
