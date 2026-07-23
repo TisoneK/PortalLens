@@ -69,3 +69,12 @@ past entries — append corrections instead.
 - **Outcome:** partial — Phase 1 setup complete, Windows environment recorded, pre-existing path-separator test failures documented. No feature target given for this session; awaiting user direction for next steps.
 - **Open items:** structured `OpenQuestion` (ADR-9) is the recommended next build per prior sessions; first analysis step (DNS) against persisted investigation; 2 pre-existing Windows test failures need path-portability fix
 - **Report:** .context/memory/reviews/2026-07-23-review-5.md
+
+---
+## 2026-07-23 — Session 7
+- **Agent:** Claude Code | **Model:** claude-opus-4-8 | **Platform:** Tisone's Mac mini (Darwin 24.6.0 / macOS 15, local) | **Role:** engineer | **Core:** 0.3.0
+- **Task:** ADR-9 first slice — replace `PortalReport.open_questions: list[str]` with a structured `OpenQuestion` model (subject, optional edge `kind`, question, `resolves_with` step slugs). Model + migration only; the AnalysisStep registry is a later slice.
+- **Commits:** 4 (1231588 lock, 8517297 feat, 34c75ac docs, + this log). Every push used `pull --rebase` first (concurrent Windows/Copilot session earlier today). Authored as Tisone Kironget <tisonkironget@gmail.com> (corrected identity).
+- **Outcome:** done — `OpenQuestion` in `portal.py`; analyzer emits structured questions (upstream carries `UPSTREAM_OF`; documented-only signature questions carry empty `resolves_with` deliberately); Markdown renderer prints `Resolves with:`; TUI panel shows a `next:` hint (with `rich.markup.escape`). Investigation store unchanged — pydantic JSON round-trips it for free (ADR-8 prediction held). 135 → 138 tests; ruff + mypy clean; verified the structured questions survive the SQLite persist/reload across processes.
+- **Open items:** `AnalysisStep` registry (next ADR-9 slice) — owns the step slugs, computes the "next investigation" queue, wires first steps (DNS, IP/ASN) against a persisted investigation using the already-built `Investigation.is_authorized(...)` seam. Add a test that every emitted `resolves_with` slug is a registered step.
+- **Report:** .context/memory/reviews/2026-07-23-review-7.md

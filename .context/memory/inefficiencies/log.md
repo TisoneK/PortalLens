@@ -83,3 +83,11 @@ if literally nothing slowed you down.
 - **Cause:** I skipped the local edition's **Step 1** git-identity check. Step 1 explicitly says: "If git identity is not configured (`git config user.name` returns empty), set it using the Pre-Flight values." `git config user.name` DID return empty — but commits succeeded (git auto-derives rather than erroring), so nothing forced me to notice. I never ran the check at session 2's start and it propagated silently across three sessions.
 - **Workaround / fix:** `git config --local user.name "Tisone K" && git config --local user.email "TisoneK@users.noreply.github.com"` (user chose the project identity). Verified with `git var GIT_AUTHOR_IDENT`. Recorded on this machine's block in `system/environments.md` so the next local session starts from a known-good identity.
 - **Prevent next time:** Run the Step-1 identity check at the START of every local session, and treat "commit succeeded" as NOT proof the identity is right — `git commit` never fails on an unconfigured identity, it fabricates one. Verify with `git var GIT_AUTHOR_IDENT` (not just `git config user.name`) before the first commit. The environments.md block now records the correct values for this machine.
+
+---
+## 2026-07-23 — Claude Code / claude-opus-4-8 (Session 7)
+- **Problem:** None that cost time. Worth noting for the next agent: changing a widely-consumed field's type (`open_questions: list[str]` → `list[OpenQuestion]`) went smoothly because a single upfront `grep -rn "open_questions\|OpenQuestion" src tests` mapped every consumer (analyzer, Markdown renderer, TUI panel, CLI count, three test files) before any edit. Nothing was missed; the first full test run was green.
+- **Cost:** negligible.
+- **Cause:** n/a.
+- **Workaround / fix:** n/a.
+- **Prevent next time:** When changing a model field's type, grep every reference first and migrate all consumers in one pass. The TUI (an optional-extra consumer) is the easy one to forget — it broke in no way only because the grep caught `tui/widgets.py`.
