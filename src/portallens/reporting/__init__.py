@@ -89,7 +89,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         for obs in rows:
             ev_ids = ", ".join(obs.evidence_ids) if obs.evidence_ids else "-"
             conf_label = _label_for(obs.confidence)
-            lines.append(f"- **[{conf_label.value} · {obs.confidence}%]** {obs.statement}")
+            lines.append(f"- **[{conf_label.value} | {obs.confidence}%]** {obs.statement}")
             lines.append(f"  - Evidence: {ev_ids}")
             if obs.note:
                 lines.append(f"  - Note: {obs.note}")

@@ -104,7 +104,7 @@ def infer_relationships(
             inferences.append(
                 RelationshipInference(
                     kind=RelationshipKind.REDIRECTS_TO,
-                    other=f"{source} → {target}",
+                    other=f"{source} -> {target}",
                     confidence=confidence.value,
                     evidence_ids=ev_ids,
                     note=f"`{source}` redirects to `{target}` (observed via gateway back-link parameter on the target URL).",
@@ -122,7 +122,7 @@ def infer_relationships(
         inferences.append(
             RelationshipInference(
                 kind=RelationshipKind.USES_PLATFORM,
-                other=f"{source} → {platform.platform}",
+                other=f"{source} -> {platform.platform}",
                 confidence=uses_confidence.value,
                 evidence_ids=ev_ids,
                 note=(
@@ -135,7 +135,7 @@ def infer_relationships(
         inferences.append(
             RelationshipInference(
                 kind=RelationshipKind.AUTHENTICATES_FOR,
-                other=f"{platform.platform} → {source}",
+                other=f"{platform.platform} -> {source}",
                 confidence=auth_confidence.value,
                 evidence_ids=ev_ids,
                 note=(

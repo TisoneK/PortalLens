@@ -378,7 +378,7 @@ def investigate(
     click.echo(f"Investigation saved: {investigation.id}")
     click.echo(f"  Target:   {investigation.target}")
     click.echo(f"  Strongest fingerprint: {headline}")
-    click.echo(f"  Relationships: {len(report.relationships)} · Open questions: {len(report.open_questions)}")
+    click.echo(f"  Relationships: {len(report.relationships)} | Open questions: {len(report.open_questions)}")
     click.echo(f"\nInspect it:  portallens show {investigation.id}")
 
 
@@ -422,7 +422,7 @@ def show(investigation_id: str, audit: bool, db_path: str | None) -> None:
         click.echo(render_markdown(investigation.report))
         return
 
-    click.echo(f"# Audit trail — {investigation.id}")
+    click.echo(f"# Audit trail - {investigation.id}")
     click.echo(f"\nTarget: {investigation.target}")
     click.echo(f"Created: {investigation.created_at.isoformat(timespec='seconds')}")
     granted = ", ".join(sorted(investigation.authorized_techniques)) or "none"
