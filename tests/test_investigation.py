@@ -211,10 +211,15 @@ class TestDbPathResolution:
     def test_xdg_data_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("PORTALLENS_DB", raising=False)
         monkeypatch.setenv("XDG_DATA_HOME", "/xdg")
-        assert resolve_db_path(None) == "/xdg/portallens/investigations.db"
+        # Build the expectation the way resolve_db_path does, so the assertion
+        # is OS-native — a hardcoded "/"-joined string fails on Windows, where
+        # str(Path(...)) uses "\" (found by Session 6 / GitHub Copilot on Windows).
+        assert resolve_db_path(None) == str(Path("/xdg") / "portallens" / "investigations.db")
 
     def test_default_under_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("PORTALLENS_DB", raising=False)
         monkeypatch.delenv("XDG_DATA_HOME", raising=False)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: Path("/home/tester")))
-        assert resolve_db_path(None) == "/home/tester/.local/share/portallens/investigations.db"
+        assert resolve_db_path(None) == str(
+            Path("/home/tester") / ".local" / "share" / "portallens" / "investigations.db"
+        )
