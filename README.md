@@ -101,6 +101,22 @@ app = PortalLensApp(report)
 app.run()
 ```
 
+### Saved investigations
+
+Analysis can be persisted instead of printed. An **investigation** outlives the process — it has an id, keeps the report, records which active techniques you've asserted authorization for (each timestamped), and an audit log of what was done.
+
+```bash
+# Analyze and save; prints the new investigation's id
+portallens investigate "http://portal.example/login?dst=..." "https://captive.example/..."
+
+portallens investigations                 # list saved investigations, newest first
+portallens show <id>                      # render the stored report
+portallens show <id> --audit              # show the authorization + audit trail
+portallens authorize <id> --technique resolve_dns --note "customer confirmed"
+```
+
+The database lives at `$XDG_DATA_HOME/portallens/investigations.db` by default (override with `--db` or `$PORTALLENS_DB`). It is plain SQLite — no server, works on desktop and on a phone under Termux.
+
 ### Active analysis (requires explicit authorization)
 
 Active techniques — HTTP fetching, DNS resolution, port scanning — are gated behind an `AcquisitionPolicy` and a CLI authorization flag. The default policy is **passive**.
@@ -126,6 +142,8 @@ PortalLens
 │   ├── registry.py            # @register_portal decorator
 │   ├── acquisition/           # URL parsing (passive) + HTTP fetch (active, gated)
 │   ├── reporting/             # Markdown renderer (canonical output)
+│   ├── investigation/         # Investigation aggregate + SQLite store (persistence)
+│   ├── tui/                   # investigation-console TUI (optional [tui] extra)
 │   ├── plugins/
 │   │   └── captive_wifi/      # First plugin — fingerprinting + relationship inference
 │   │       └── signatures.py  # the provider registry — the only file that names a vendor

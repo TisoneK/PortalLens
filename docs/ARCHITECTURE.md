@@ -152,10 +152,43 @@ The PortalLens design conversation identified three components:
 
 - **PortalLens** — passive portal intelligence. *(Implemented here.)*
 - **Investigation-console TUI** — interactive presentation layer. *(Implemented — see "TUI" below.)*
+- **Investigation persistence** — a durable, queryable record of each investigation. *(Implemented — see "Investigation persistence" below.)*
 - **NetAudit** — authorized active security assessment. *(Planned — separate `audit` module behind `AcquisitionPolicy` flags.)*
-- **DisclosureDesk** — responsible disclosure report generation + tracking. *(Planned — extends `reporting/` with SARIF + disclosure-tracking output.)*
+- **DisclosureDesk** — responsible disclosure report generation + tracking. *(Planned — extends `reporting/` with SARIF + disclosure-tracking output; builds on the investigation store below.)*
 
 The `Portal` abstraction is broad enough that NetAudit can be implemented as another plugin (`PortalType.CAPTIVE_WIFI` analyzer with active policy enabled), rather than a separate product. DisclosureDesk is a reporting concern, not an analysis concern — it lives alongside `render_markdown` in `reporting/`.
+
+## Investigation persistence (ADR-8)
+
+PortalLens was stateless: URLs in, `PortalReport` out. An **`Investigation`** (`portallens.investigation`) makes analysis durable — it bundles a target, the report produced for it, a per-technique authorization record (ADR-10), and an append-only audit log, and persists them so a target can be revisited and its history kept.
+
+```
+Investigation
+├── id / target / portal_type / created_at / updated_at
+├── report            # the PortalReport — "step zero" is analyze(); steps append later (ADR-9)
+├── authorizations    # [AuthorizationGrant] — per technique, timestamped (ADR-10)
+└── audit_log         # append-only [AuditEntry] — what was done, when
+```
+
+`analyze()` is unchanged; it is the passive bootstrap ("step zero") that seeds the report. `PortalReport` stays the **immutable snapshot**; `Investigation` is the **mutable, persisted aggregate** that owns it.
+
+### Storage — document-in-SQLite
+
+The store (`InvestigationStore`) is SQLite, per ADR-8's reasoning: DisclosureDesk will need to query investigations (by target, disclosure state, date), and disclosure-state transitions want to be transactional. Each investigation is one row. The queryable facts — id, target, portal type, timestamps — are **promoted to indexed columns**; the full aggregate (including the still-evolving evidence graph) is kept as a **JSON document** in a `data` column.
+
+This is deliberate, not a failure to normalize. The report's shape is still changing (structured open questions and analysis steps are coming), and a brittle relational schema for it now would cost more than it buys. The promoted columns serve the queries DisclosureDesk needs; the JSON gives the aggregate room to evolve. When a query need arises the columns can't serve, the fix is a migration that promotes another column.
+
+### Migrations from day one
+
+Schema version lives in SQLite's own `PRAGMA user_version`. Migrations are an ordered ledger (`_MIGRATIONS`) applied on connect — a fresh database and an old one both converge by running every migration past their current version. So the next schema change (e.g. promoting a `disclosure_state` column for DisclosureDesk) is an **append to the ledger**, never a rewrite. A shipped migration is never edited.
+
+### Authorization is part of the audit trail (ADR-10)
+
+Authorization is asserted **per technique** and **timestamped**, and recorded in the investigation itself — not held as a single boolean at invocation. It is not a badge: you can be authorized to resolve DNS and not to port-scan. For a disclosure report, "the operator asserted authorization for DNS resolution at 14:31 before it ran" is *part of the evidence*, so it lives in the record beside the findings. The set of authorizable techniques is derived from `AcquisitionPolicy`'s boolean fields, so ADR-13's future tiers (`use_osint_apis`, `execute_scripts`) become authorizable with no edit to the investigation code.
+
+### CLI
+
+Four subcommands operate the store: `investigate` (analyze + save, prints the new id), `investigations` (list, newest first), `show <id>` (render the stored report, or `--audit` for the trail), and `authorize <id> --technique <t>` (record a timestamped grant). The database path resolves from `--db` → `$PORTALLENS_DB` → `$XDG_DATA_HOME/portallens/investigations.db`.
 
 ## TUI (ADR-7)
 
