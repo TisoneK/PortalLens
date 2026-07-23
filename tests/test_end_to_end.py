@@ -89,7 +89,7 @@ class TestEndToEnd:
         portal = CaptiveWifiPortal()
         report = portal.analyze(AnalysisContext(urls=[ISPMAN_URL, MAZ_URL]))
         markdown = render_markdown(report)
-        assert "# PortalLens Report — Captive Wi-Fi Portal" in markdown
+        assert "# PortalLens Report - Captive Wi-Fi Portal" in markdown
         assert "## Executive Summary" in markdown
         assert "## Captured Evidence" in markdown
         assert "## Observed Facts" in markdown

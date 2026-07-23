@@ -29,7 +29,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
     """
 
     portal_label = _TYPE_LABELS.get(report.portal_type, report.portal_type.value)
-    heading = title or f"PortalLens Report — {portal_label}"
+    heading = title or f"PortalLens Report - {portal_label}"
 
     lines: list[str] = []
     lines.append(f"# {heading}")
@@ -56,7 +56,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
     else:
         lines.append("- No relationships met the 40% confidence threshold for inclusion in the summary.")
     if report.open_questions:
-        lines.append(f"- Open questions: {len(report.open_questions)} — see the Open Questions section.")
+        lines.append(f"- Open questions: {len(report.open_questions)} - see the Open Questions section.")
     lines.append("")
 
     # Evidence — raw inputs
@@ -87,7 +87,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         lines.append(f"## {obs_label}")
         lines.append("")
         for obs in rows:
-            ev_ids = ", ".join(obs.evidence_ids) if obs.evidence_ids else "—"
+            ev_ids = ", ".join(obs.evidence_ids) if obs.evidence_ids else "-"
             conf_label = _label_for(obs.confidence)
             lines.append(f"- **[{conf_label.value} · {obs.confidence}%]** {obs.statement}")
             lines.append(f"  - Evidence: {ev_ids}")
@@ -103,9 +103,9 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         lines.append("|---|---|---|---|")
         for fp in sorted(report.fingerprints, key=lambda f: -f.confidence):
             label = _label_for(fp.confidence)
-            ev_ids = ", ".join(fp.evidence_ids) if fp.evidence_ids else "—"
+            ev_ids = ", ".join(fp.evidence_ids) if fp.evidence_ids else "-"
             lines.append(
-                f"| {fp.platform} | {fp.version or '—'} | "
+                f"| {fp.platform} | {fp.version or '-'} | "
                 f"{fp.confidence}% ({label.value}) | {ev_ids} |"
             )
         lines.append("")
@@ -118,7 +118,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         lines.append("|---|---|---|---|")
         for rel in sorted(report.relationships, key=lambda r: -r.confidence):
             label = _label_for(rel.confidence)
-            ev_ids = ", ".join(rel.evidence_ids) if rel.evidence_ids else "—"
+            ev_ids = ", ".join(rel.evidence_ids) if rel.evidence_ids else "-"
             lines.append(
                 f"| {rel.kind.value} | `{rel.other}` | "
                 f"{rel.confidence}% ({label.value}) | {ev_ids} |"
@@ -149,7 +149,7 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         "Every non-fact statement carries an integer score in `[0, 100]` "
         "and a derived label. Reports distinguish observed facts (direct "
         "evidence), inferences (conclusions drawn from evidence), and "
-        "hypotheses (speculative explanations requiring verification — "
+        "hypotheses (speculative explanations requiring verification - "
         "confidence capped at `low` by convention)."
     )
     lines.append("")
