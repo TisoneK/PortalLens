@@ -43,3 +43,11 @@ if literally nothing slowed you down.
 - **Cause:** The session-1 tests were written to assert that inferences exist, which is the natural shape for a first implementation. That shape cannot detect duplication or a changed score, which is exactly what a refactor threatens.
 - **Workaround / fix:** `git worktree add <scratch> <pre-refactor-sha>`, render the same fixture through both trees with a 6-line script, `diff` the Markdown. Cheap, and it found a real bug in the *old* code (see review H-1). A `test_each_relationship_appears_once` regression test now exists.
 - **Prevent next time:** For any refactor claiming "behaviour unchanged", diff the actual rendered output against a worktree of the base commit before committing. Do not accept a passing suite as the proof — say which one you ran (Pitfall #42 applies to "unchanged" claims as much as to "tests pass").
+
+---
+## 2026-07-23 — Claude Code / claude-opus-4-8 (Session 3)
+- **Problem:** None this session — appending ADRs and backlog items is friction-free with the templates in place. The one judgment call (how many ADRs to split the conversation into) resolved cleanly: seven atomic decisions, each constraining future agents differently, rather than one omnibus entry.
+- **Cost:** negligible.
+- **Cause:** n/a.
+- **Workaround / fix:** n/a.
+- **Prevent next time:** n/a — noting for honesty that a decisions-only session is where the `.context/` layout pays off most: there was an obvious, correct home for every decision.

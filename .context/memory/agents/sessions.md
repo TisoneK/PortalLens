@@ -32,3 +32,13 @@ past entries — append corrections instead.
 - **Open items:** 3 appended to `tasks/backlog.md` (validate the 3 documented-only signatures — supersedes session 1's CoovaChilli item; decide where the signature provenance ledger lives; HTML fingerprinting is now a registry field rather than per-vendor detectors). Session-1 items otherwise unaffected. New ADR-5 + ADR-6 in `plans/decisions.md` constrain how future providers are added.
 - **Note on the target:** the one-line chat target was ambiguous between "the analyzed portal belongs to a specific provider" and "the analyzer is centered on a specific provider". Read as the latter — the former is already implemented. Work is additive; nothing was removed, so a different reading can be taken from this base.
 - **Report:** .context/memory/reviews/2026-07-23-review-2.md
+
+---
+## 2026-07-23 — Session 3
+- **Agent:** Claude Code | **Model:** claude-opus-4-8 | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15, local) | **Role:** engineer | **Core:** 0.3.0
+- **Task:** Record the architectural decisions from the TUI + advanced-security design conversation as ADRs, and anchor them with backlog items. Decisions only — no product code.
+- **Commits:** 1 (0e67544) — `chore(context): ADRs for the investigation-console + advanced-security direction`
+- **Outcome:** done — ADR-7..13 appended to `plans/decisions.md` (TUI as responsive presentation layer; Investigation as persisted core; analysis-step registry with computed next-steps; per-technique timestamped authorization; SecurityCheck registry; assess-not-exploit + bounded business intelligence; distinct AcquisitionPolicy consent tiers). 7 anchoring items appended to `backlog.md`. No code changed; suite still 80 (not re-run — no source touched).
+- **Open items:** 7 new backlog items (structured OpenQuestion → the recommended first build; Investigation+SQLite; AnalysisStep registry + DNS/IP-ASN; responsive TUI; SecurityCheck registry; CT-log OSINT; client-fingerprinting privacy finding). Recommended order in ADR-9's "build this before any TUI" note and the review-2 sequencing.
+- **Note:** ADR-12 is a standing scope/ethics boundary binding now, not a future-implementation decision — future security work must not cross assess→exploit or build org-profiling collectors without a superseding ADR.
+- **Report:** none (decisions-only session — see the ADRs directly; no reviewable code diff)
