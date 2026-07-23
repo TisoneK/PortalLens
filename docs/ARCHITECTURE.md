@@ -67,11 +67,16 @@ The default policy is passive. Active functions in `portallens.acquisition.fetch
 ```
 Portal (abstract)
 └── CaptiveWifiPortal (registered against PortalType.CAPTIVE_WIFI)
-    ├── url_parser.py     # passive URL parsing — MikroTik / ISPMan / CoovaChilli signatures
-    ├── fingerprints.py   # platform detection with confidence scores
+    ├── signatures.py     # the provider registry — every platform PortalLens knows
+    ├── url_parser.py     # passive URL parsing — runs the registry against a URL
+    ├── fingerprints.py   # scores each matched signature into a confidence
     ├── relationship.py   # REDIRECTS_TO / USES_PLATFORM / OPERATES_NETWORK / RESELLS_BANDWIDTH
     └── analyzer.py       # ties it together, builds the PortalReport
 ```
+
+Only `signatures.py` names a vendor. The three modules below it iterate the
+registry, so teaching the analyzer a new provider is a registry entry, not a
+code change.
 
 Future plugins (`web_auth`, `payment`, `isp`) register themselves the same way on import:
 
@@ -88,21 +93,37 @@ The CLI dispatches via the registry: `get_portal_class(PortalType.WEB_AUTH)`.
 
 ### URL parsing is passive and signature-based
 
-The analyzer never fetches a URL to fingerprint it. It works purely from `urllib.parse`:
+The analyzer never fetches a URL to fingerprint it. It works purely from `urllib.parse`. Each entry in the registry is a `PortalSignature`: a set of rules that decide whether it fires, and the weights each matched signal contributes.
 
-- **MikroTik** signature: presence of `link-login`, `link-orig`, `link-login-only`, `dst`, `mac`, `ip` in the query string. The canonical signature is `link-login` + `link-orig` together, or ≥4 of the variables present.
-- **ISPMan** signature: host suffix `.ispman.tech` (or `ispman.tech` itself) + path prefix `/hotspots/` + path suffix `/select`.
-- **CoovaChilli** signature: presence of `challenge`, or `userurl` + `uamip` together.
+A rule can require query parameters (all of them, or any of one set, or *n* of the platform's known variables), a host suffix, and a path prefix/suffix. A signature fires if any of its rules matches:
 
-A URL can match multiple flavors. The ISPMan URL captured from the wild carries the MikroTik signature too — because MikroTik's redirect forwards its full parameter set to the external portal.
+- **MikroTik** (gateway): `link-login` + `link-orig` together, or ≥4 of its documented hotspot variables, or `dst` on a `/login` path.
+- **CoovaChilli** (gateway): `challenge`, or `userurl` + `uamip` together.
+- **UniFi** (gateway): the `/guest/s/<site>/` controller path plus one of `id` / `ap` / `ssid`.
+- **ISPMan** (hosted platform): host suffix `ispman.tech` + path prefix `/hotspots/` + path suffix `/select`.
+- **Meraki** (hosted platform): host suffix `network-auth.com` + path prefix `/splash/`.
+
+Host suffixes match on label boundaries, so `evilispman.tech` is not ISPMan.
+
+### Two layers: gateways and hosted platforms
+
+The registry distinguishes the software running on the operator's own hardware (**gateway** — MikroTik, CoovaChilli, UniFi; identified by the query variables it emits) from the service hosting the portal on the operator's behalf (**hosted platform** — ISPMan, Meraki; identified by its own host and path).
+
+The distinction is what makes relationship inference provider-agnostic. A redirect landing on *any* hosted-platform host supports `USES_PLATFORM` and `AUTHENTICATES_FOR`, and a host owned by a hosted platform is never reported as the network operator. Neither rule names a vendor.
+
+A URL routinely matches both layers: the ISPMan URL captured from the wild carries the MikroTik signature too, because MikroTik's redirect forwards its full parameter set to the external portal.
 
 ### Fingerprints are independent and additive
 
-Each fingerprint detector runs independently and produces its own `FingerprintMatch` with its own confidence. A single URL can produce multiple matches — that's a feature, not a bug. The report surfaces all of them so the reader can see the full picture.
+Each matched signature is scored independently and produces its own `FingerprintMatch` with its own confidence. A single URL can produce multiple matches — that's a feature, not a bug. The report surfaces all of them so the reader can see the full picture.
+
+### Signatures carry their provenance
+
+A rule transcribed from vendor documentation is not as trustworthy as one checked against a real captured URL, and a calibrated report must not present them identically. Every signature records which it is. A signature that has never matched a URL in this project's fixtures says so in its fingerprint note and adds an open question inviting the reader to discount the match.
 
 ### Relationship inference is asymmetric
 
-The key insight (from the PortalLens design conversation): a single observed redirect (`maz.wifi` → `captive.ispman.tech`) supports some inferences very strongly but NOT others.
+The key insight (from the PortalLens design conversation): a single observed redirect (`maz.wifi` → `captive.ispman.tech`) supports some inferences very strongly but NOT others. The table below uses the ISPMan fixture, but the rules behind it read the registry — substitute any hosted platform and the reasoning is identical.
 
 | Inference | Confidence | Why |
 |---|---|---|
@@ -116,11 +137,12 @@ The `RESELLS_BANDWIDTH` relationship is deliberately capped at `low` — without
 
 ### Open questions are mandatory
 
-The analyzer populates `PortalReport.open_questions` for anything it couldn't close with the supplied evidence. Three are always present (without authorized active assessment):
+The analyzer populates `PortalReport.open_questions` for anything it couldn't close with the supplied evidence. These are always present (without authorized active assessment):
 
 1. Who is the legal entity behind the local operator hostname?
 2. Who is the upstream Internet bandwidth provider?
-3. Is the MikroTik admin interface exposed to the customer network?
+3. Is the administrative interface of each detected gateway exposed to the customer network?
+4. Does each fingerprint whose signature has never been validated in the field actually hold?
 
 These are the prompts for follow-up — either with more user input (HTML captures, DNS records) or an explicitly authorized active assessment.
 

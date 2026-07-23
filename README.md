@@ -6,7 +6,7 @@ PortalLens takes a portal URL (today: a captive Wi-Fi portal URL) and produces a
 
 It is built for the situation where you've been redirected through a captive portal (e.g. `maz.wifi` → `captive.ispman.tech`) and want to know:
 
-- What platform is this portal running? (MikroTik RouterOS? ISPMan? CoovaChilli?)
+- What platform is this portal running? (MikroTik RouterOS? CoovaChilli? UniFi? ISPMan? Meraki?)
 - Who operates the underlying Wi-Fi network?
 - Is the redirect target a platform provider, a reseller, or the network operator itself?
 - What can we say with confidence vs. what's speculation?
@@ -15,7 +15,7 @@ PortalLens never claims something as fact unless the evidence supports it. Hypot
 
 ## Status
 
-Alpha — captive Wi-Fi passive analysis is implemented and tested against a real ISPMan URL pair. Active security assessment is gated behind explicit authorization and is the next planned surface.
+Alpha — captive Wi-Fi passive analysis is implemented and tested against a real ISPMan URL pair. The MikroTik and ISPMan signatures are validated against that capture; the CoovaChilli, UniFi, and Meraki signatures come from vendor documentation and have not yet been checked against a captured URL, which the report says wherever one of them fires. Active security assessment is gated behind explicit authorization and is the next planned surface.
 
 ## Install
 
@@ -72,6 +72,8 @@ portallens --fetch-urls --i-have-authorization "https://example.com/login"
 
 PortalLens is built around one abstraction: the `Portal`. Every portal type (captive Wi-Fi, web auth, payment, ISP) is a `Portal` subclass registered against a `PortalType`. The CLI dispatches a URL to the right analyzer via the registry.
 
+Within the captive Wi-Fi analyzer, the platforms themselves are data. Everything PortalLens knows about a provider — how to recognize it, what each signal is worth, and whether the rule has ever been checked against a real captured URL — lives in one registry, so adding a provider is a registry entry rather than a code change.
+
 ```
 PortalLens
 ├── src/portallens/
@@ -83,6 +85,7 @@ PortalLens
 │   ├── reporting/             # Markdown renderer (canonical output)
 │   ├── plugins/
 │   │   └── captive_wifi/      # First plugin — fingerprinting + relationship inference
+│   │       └── signatures.py  # the provider registry — the only file that names a vendor
 │   └── cli.py                 # `portallens` CLI
 ├── tests/                     # Unit + end-to-end tests with real ISPMan URL fixture
 └── pyproject.toml
