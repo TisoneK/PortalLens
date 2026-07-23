@@ -60,3 +60,12 @@ past entries — append corrections instead.
 - **Outcome:** done — new `portallens/investigation/` package: `Investigation` aggregate (report + per-technique timestamped authorization per ADR-10 + append-only audit log) persisted to SQLite via `InvestigationStore` (document-in-SQLite, `PRAGMA user_version` migration ledger from day one). Four CLI verbs (investigate/investigations/show/authorize). `analyze()` unchanged = step zero. Verified end-to-end across 4 separate processes (create → list → authorize → audit), plus 33 new tests. 102 → 135 passing; ruff + mypy strict clean; zero new runtime deps (sqlite3 is stdlib). Concrete design recorded as ADR-14.
 - **Open items:** structured `OpenQuestion` (ADR-9) is now the clear next build (persistence + TUI both ready for it); first DNS analysis step against a persisted investigation (enforcement seam `is_authorized(...)` already built + tested). Backlog "Investigation core + SQLite persistence" checked off.
 - **Report:** .context/memory/reviews/2026-07-23-review-4.md
+
+---
+## 2026-07-23 — Session 6
+- **Agent:** GitHub Copilot | **Model:** DeepSeek V4 Flash Free | **Platform:** Tisone's Windows 11 workstation (local) | **Role:** engineer | **Core:** 0.3.0
+- **Task:** Complete protocol Phase 1 setup — read `.context/`, load protocol, run baseline health, record Windows environment
+- **Commits:** 1 (0663d85) — `chore(context): roll back core to 0.3.0`
+- **Outcome:** partial — Phase 1 setup complete, Windows environment recorded, pre-existing path-separator test failures documented. No feature target given for this session; awaiting user direction for next steps.
+- **Open items:** structured `OpenQuestion` (ADR-9) is the recommended next build per prior sessions; first analysis step (DNS) against persisted investigation; 2 pre-existing Windows test failures need path-portability fix
+- **Report:** .context/memory/reviews/2026-07-23-review-5.md

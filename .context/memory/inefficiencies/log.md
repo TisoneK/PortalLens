@@ -67,3 +67,11 @@ if literally nothing slowed you down.
 - **Cause:** The file-state cache is invalidated by my own tool calls, not by `git pull` (or any out-of-band change). Right after a pull, every tracked file the pull touched can have a stale "unchanged" state.
 - **Workaround / fix:** After a `git pull` that reports changed files, treat the file-state cache as stale for those files — re-read with `cat` (or Read, ignoring an "unchanged" note) before editing them. Editing produced a correct "the file had been modified on disk since you last read it" warning on one edit, which confirms the harness does detect it at write time — but the read-time "unchanged" claim is the trap.
 - **Prevent next time:** Always `cat` a pulled-and-modified file before Editing it, regardless of what the Read cache says. This pairs with Pitfall #32 (don't inspect stale local state) — the same staleness applies to the harness's own file cache right after a pull.
+
+---
+## 2026-07-23 — GitHub Copilot / DeepSeek V4 Flash Free (Session 6)
+- **Problem:** Two investigation-store path-resolution tests (`TestDbPathResolution::test_xdg_data_home`, `TestDbPathResolution::test_default_under_home`) assert POSIX `/`-separated paths and fail on Windows, which uses `\` separators.
+- **Cost:** ~3 min identifying as pre-existing platform issue, not a regression.
+- **Cause:** Tests written on macOS by Claude Code (session 5) with hardcoded POSIX path expectations (`"/xdg/portallens/investigations.db"`). The `resolve_db_path()` function correctly returns OS-native paths, but the tests compare against Unix paths.
+- **Workaround / fix:** Use `os.path.join` or `Path(...)` operators in test assertions instead of hardcoded `/`-separated strings. E.g., `assert resolve_db_path(None) == Path("/xdg") / "portallens" / "investigations.db"`.
+- **Prevent next time:** When writing path-assertion tests, use `os.path.join()` or `Path` operators rather than literal `/`-separated strings. This is equally portable and equally readable.

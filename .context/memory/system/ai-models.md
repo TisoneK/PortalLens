@@ -11,6 +11,7 @@ accordingly).
 |---|---|---|---|---|
 | Super Z | unknown (GLM family) | 2026-07-23 | 2026-07-23 | 2 |
 | Claude Code | claude-opus-4-8 | 2026-07-23 | 2026-07-23 | 2 |
+| GitHub Copilot | DeepSeek V4 Flash Free | 2026-07-23 | 2026-07-23 | 1 |
 
 ## Observations
 

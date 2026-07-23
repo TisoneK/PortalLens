@@ -51,3 +51,21 @@ block (and its "last verified" date) every time you run on it again.
   - **Reach for `python3.12`, never bare `python3`** — the bare one is 3.9 and will fail on this project's syntax and typing.
   - `.venv/` is gitignored; a fresh clone needs the venv step above before anything runs.
   - `git worktree add <path> <sha>` works and is a clean way to render "before" output for a refactor diff. Remove it with `git worktree remove <path>` when done.
+
+---
+## Tisone's Windows workstation (last verified 2026-07-23)
+- **Identify by:** repo at `C:\Users\tison\Dev\PortalLens`, Windows 11, local IDE agent (GitHub Copilot), user's own git credentials
+- **OS:** Windows 11 (10.0.22631)
+- **Runtimes:** `C:\Python314\python.exe` (Python 3.14.2) is installed, but the project uses `.venv\Scripts\python` (3.14.2) inside the repo's venv at `C:\Users\tison\Dev\PortalLens\.venv\`
+- **Package manager:** pip inside the project `.venv`
+- **Verified commands** (all run successfully on this machine, this project):
+  - `.venv\Scripts\python -m pytest -q` — 133 passed, 2 failed (pre-existing Windows path-separator issues in `test_xdg_data_home` + `test_default_under_home`)
+  - `.venv\Scripts\ruff check .` — All checks passed
+  - `.venv\Scripts\python -m mypy src` — Success: no issues found in 23 source files
+  - `git push origin main` — works with the user's existing GitHub credentials (no PAT needed for local agent)
+- **Quirks:**
+  - Use `.venv\Scripts\python` (not bare `python` or `python3`) for all Python invocations
+  - pytest path tests fail on Windows (POSIX path expectations). Pre-existing platform issue, not a regression
+  - `context-sync` shell scripts need Git Bash at `C:\Program Files\Git\usr\bin\bash.exe` — verify/status/update may fail due to CRLF in MANIFEST.sha256 (see `memory/flaws/log.md`)
+  - Windows paths use `\` — be careful with path constants in tests
+  - No `context-sync verify` on this platform — use Python-based verification as fallback
