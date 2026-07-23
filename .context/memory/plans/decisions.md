@@ -72,3 +72,86 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - The cost of adding a speculative signature is paid in the report's noise, which is the correct place for it to be visible.
   - Future agents MUST default a new signature to `DOCUMENTED` and MUST NOT promote one to `VALIDATED` without adding the capture to `tests/data/` that justifies it.
   - Future agents MUST NOT remove the provisional note or open question to tidy up report output. If the noise becomes a problem, the fix is to validate the signature or drop it — not to hide its status.
+
+---
+## ADR-7: The TUI is a presentation layer, and it is responsive from phone to desktop (2026-07-23)
+- **Status:** accepted (design decision — not yet implemented)
+- **Context:** The project will grow an investigation-console TUI. Three risks were identified in the design conversation: (a) scanning/analysis logic leaking into the UI; (b) reorganizing the plugin vertical-slice layout (ADR-4) into function-first packages (`scanners/`, `intelligence/`) to suit the UI, which would spend the plugin boundary on a cosmetic change; (c) a fixed-width layout that assumes a wide desktop terminal. The user explicitly requires the TUI to run on mobile via Termux **and** desktop — a phone in portrait can be ~40 columns.
+- **Decision:** The TUI is a pure presentation + control layer. It renders `PortalReport` / `Investigation` state and issues commands to the engine; it contains **no** acquisition, fingerprinting, or inference logic. Built with **Textual**, shipped behind an optional extra (`portallens[tui]`) so the library and CLI keep their `click + httpx + pydantic` dependency set. The layout **must be responsive**: it targets terminals from ~40 columns (Termux, portrait) to wide desktop. Panels reflow and stack rather than assuming width; the relationship graph degrades to an indented/linear form below a width threshold. The plugin vertical-slice structure (`plugins/<type>/`) is preserved — `tui/` and `reports/` are **sibling** cross-cutting layers, not a reorganization of the analyzers.
+- **Consequences:**
+  - No vendor or example hostname is baked into any screen. `maz.wifi` is a test fixture in `tests/data/` only — never a default, placeholder, or demo value in the UI.
+  - Box borders and layout are owned by Textual's layout engine, not hand-drawn with fixed-column box characters (the design mockups overflowed their own borders — that's the failure this rules out).
+  - The relationship graph needs an explicit narrow-terminal fallback; it must not assume it can draw a wide node diagram.
+  - Severity and status are **never encoded by colour alone** — needed for accessibility and for monochrome terminals (Termux included).
+  - A script doing `from portallens... import CaptiveWifiPortal` must not pull Textual. If `cli.py` grows a `tui` subcommand it becomes a `click.Group`; decide that before people script against the current single-command invocation.
+
+---
+## ADR-8: `Investigation` is a persisted core concept, shared by the TUI and DisclosureDesk (2026-07-23)
+- **Status:** accepted (design decision — not yet implemented)
+- **Context:** PortalLens is stateless today (URLs in, report out). The TUI vision (drill-down, history, first-seen / last-scan, incremental steps) needs state. So does the backlogged DisclosureDesk state machine (draft → submitted → acknowledged → fixed → published). Building persistence twice, or building it as a TUI feature, would strand it.
+- **Decision:** Introduce `Investigation` as a core, **persisted** concept, stored in **SQLite** (not JSON-on-disk — DisclosureDesk needs queries, and disclosure state wants transactional updates). An `Investigation` owns a target, a growing set of evidence / observations / relationships, an authorization record (ADR-10), and an audit log. `analyze()` becomes the passive bootstrap — "step zero"; further evidence is appended by analysis steps (ADR-9). Persistence is a **core concern shared by the TUI and DisclosureDesk**, not a TUI feature, and is built in core with the TUI as its first consumer.
+- **Consequences:**
+  - `PortalReport` stays the immutable snapshot / rendering type; `Investigation` is the mutable, persisted aggregate that produces reports.
+  - Persistence is built once, in core. Consumers (TUI, DisclosureDesk, CLI) query it; they don't each invent storage.
+  - SQLite chosen for queryability and transactional disclosure-state updates. Schema migrations are considered from the first version, not retrofitted.
+  - Future agents MUST NOT bolt investigation state onto the TUI layer.
+
+---
+## ADR-9: Analysis steps are a registry; the "next investigation" list is computed, not hand-written (2026-07-23)
+- **Status:** accepted (design decision — not yet implemented)
+- **Context:** The core experience is "pull the thread": DNS → IP → ASN → org; redirect → platform; portal → endpoints. The design surfaced a "NEXT INVESTIGATION →" list. Today `PortalReport.open_questions` is `list[str]` — prose, a dead end you cannot lay out a graph or a menu from.
+- **Decision:** Two coupled changes.
+  1. **`OpenQuestion` becomes structured** — `subject`, an optional edge `kind` (`RelationshipKind`, e.g. `UPSTREAM_OF` — the edge to draw), the `question` text, and `resolves_with`: a list of **step slugs** that could close it.
+  2. **An `AnalysisStep` registry**, parallel to the signature registry (ADR-5). Each step declares: `slug`, `label`, the `AcquisitionPolicy` technique it `requires` (`None` = passive), the `EvidenceType`s it `produces`, and which open-question `kind`s it can `answer`. The "next investigation" list is **computed** by matching currently-open questions to registered steps that can answer them — never hand-maintained. Register an ASN step and every report that ever asked "who's upstream?" gains that action automatically.
+- **Consequences:**
+  - Steps are **data**, like signatures. No hand-coded per-question UI list; no `if question == "...": offer(...)`.
+  - Drill-down chains are step sequences, each consuming the prior step's evidence.
+  - Per-technique authorization gating lives on the step's `requires` field (ADR-10).
+  - This **supersedes the plain-string open-questions representation**: `analyzer._open_questions()` migrates to emit `OpenQuestion` records. Improves the Markdown too — "what would resolve this" becomes a field rather than four hand-written sentences.
+  - Future agents adding an active technique add a registered `AnalysisStep`, not a branch in `analyze()`.
+
+---
+## ADR-10: Authorization is per-investigation, per-technique, timestamped, and part of the evidence (2026-07-23)
+- **Status:** accepted (design decision — not yet implemented)
+- **Context:** Once thread-pulling is the core loop, that loop **is** a sequence of authorization decisions (DNS, TLS, IP/ASN, endpoints — every rung is an active technique, ADR-1). Today `--i-have-authorization` is a single boolean at CLI invocation. For a disclosure report, the authorization assertion is itself part of the evidence — "I asserted authorization for DNS resolution at 14:31 before running it" belongs in the audit trail alongside the findings.
+- **Decision:** Authorization is asserted **per investigation, per technique**, and recorded with a **timestamp** inside the `Investigation`'s audit log. It is **not a binary badge** — a user may be authorized to resolve DNS but not to port-scan; scope is a *set* of techniques. Each analysis step checks its technique against the investigation's recorded scope before running. The activity / evidence log is **persisted as the audit trail** — it is what makes a finding defensible weeks later, not ephemeral UI chrome.
+- **Consequences:**
+  - `AcquisitionPolicy`'s per-technique flags remain the enforcement mechanism (`assert_policy` unchanged); the `Investigation` additionally records **who** asserted **what** and **when**.
+  - The TUI `[AUTHORIZED]` indicator shows **scope** (`AUTHORIZED: dns, fetch`), never a bare boolean.
+  - No step runs a technique outside the investigation's recorded scope.
+  - This audit backbone is what DisclosureDesk builds on.
+
+---
+## ADR-11: Security checks are a registry (data), keyed on evidence, not on vendor (2026-07-23)
+- **Status:** accepted (design decision — not yet implemented)
+- **Context:** Adding "advanced security" invites per-vendor security branches — the exact anti-pattern ADR-5 removed for platform detection, and **worse** here: a check that silently runs against only one provider is a false sense of coverage, which in a security tool is a defect, not just untidy.
+- **Decision:** Security checks are a **`SecurityCheck` registry**, parallel to the signature registry. A check is keyed on the **evidence it requires** (e.g. "a login form action over `http://`", "a session identifier in a URL query parameter", "an admin path reachable pre-auth", "device-fingerprinting parameters collected before authentication"), **not** on the platform. Checks run against whatever evidence an investigation holds, regardless of vendor. Provenance (ADR-6) applies: a check derived from a CVE or writeup not reproduced in-repo is `DOCUMENTED`, not `VALIDATED`, and says so in its finding.
+- **Consequences:**
+  - No `if platform == X: check_Y()`. A new check is a registry entry.
+  - Every finding carries the disclosure schema from `user/preferences.md` — Title, Affected asset, Evidence, Impact, **Confidence**, Recommended remediation, Verification status — and the confidence bands / fact-inference-hypothesis split. A confirmed reachable admin panel is a fact at 100; "appears bypassable" without a completed test is a hypothesis capped at low (ADR-3).
+  - A check firing on a `DOCUMENTED` basis is marked provisional.
+  - NetAudit (backlogged) is where these run, under active `AcquisitionPolicy`.
+
+---
+## ADR-12: Assess, never exploit — and keep intelligence reach bounded (2026-07-23)
+- **Status:** accepted (this is a standing scope/ethics boundary — binding now, for all future security work)
+- **Context:** Every advanced security capability has an exploit twin, and the README's promise that PortalLens "does not bypass authentication" is a defensibility asset, not a limitation. Separately, the "Business" intelligence surface (packages, pricing, payment provider, reseller relationships) risks drifting from "analyze a portal" into "profile an organization" — a different product with different obligations.
+- **Decision (two bounds, both binding):**
+  1. **Assess, not exploit.** The tool produces **evidence that a condition exists** and stops. Detect that a walled-garden / DNS bypass is possible → yes; perform the bypass → **no**. Detect a reflected or injectable parameter → yes; fire the payload → **no**. Detect an admin panel reachable pre-auth → yes; authenticate to it → **no**. **Auth-bypass detection stops at detection** — consistent with the README's standing promise.
+  2. **Bounded business intelligence.** Business structure is inferred **only from evidence the tool already holds for technical reasons** — a payment provider named in a form action, a tier slug in the portal's own URL path, packages listed on a page fetched under authorization. PortalLens does **not** build collectors whose purpose is gathering commercial or organizational information about a target. `RESELLS_BANDWIDTH` stays capped at low (ADR-3); a "Business" view must not present it as a conclusion.
+- **Consequences:**
+  - Keeps PortalLens inside authorized security testing rather than becoming an attack tool. This is what makes it defensible to build and to run.
+  - Future agents MUST NOT add exploit actions, or purpose-built organization-profiling collectors, without a **superseding ADR and explicit user direction**. A later agent tempted to "just make the finding actionable" by exploiting it is violating this ADR.
+
+---
+## ADR-13: `AcquisitionPolicy` has distinct consent tiers; enabling one never implies another (2026-07-23)
+- **Status:** accepted (design decision — extends ADR-1; not yet implemented)
+- **Context:** The advanced techniques span very different risk profiles, and "active" is too coarse a single axis. Certificate-Transparency-log mining touches third parties but **not the target**. Fetching the portal touches the target. Executing the portal's JavaScript can trigger auth flows, submit forms, or spend a voucher — materially more invasive than a fetch.
+- **Decision:** `AcquisitionPolicy` gains distinct flags for distinct consent, and **no flag implies another**:
+  - **`use_osint_apis`** (or similar) — third-party OSINT / passive intelligence: CT logs, ASN / RIPEstat, passive DNS. Leaves your machine but does **not** touch the target. Distinct from `fetch_urls`.
+  - existing **`fetch_urls` / `follow_redirects` / `resolve_dns` / `probe_tls` / `port_scan`** — target-facing active techniques.
+  - **`execute_scripts`** — headless-browser JavaScript execution. **Not implied by `fetch_urls`.** Its own capability, and likely its own heavyweight dependency (Playwright, ~300MB) behind an optional extra, plus its own ADR when built.
+- **Consequences:**
+  - `is_passive` currently means "no target-facing active technique." The OSINT tier needs its own place in that logic — touching third parties is not "passive" even though the target is untouched, so OSINT is neither `is_passive` nor target-facing-active; it is its own middle tier.
+  - Each new technique picks the correct tier rather than piggy-backing on `fetch_urls` for convenience.
+  - Future agents MUST NOT let `fetch_urls=True` silently enable OSINT calls or script execution.
