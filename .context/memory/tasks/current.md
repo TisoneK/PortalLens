@@ -6,5 +6,5 @@ you find a stale in-progress entry here, a prior session died mid-task —
 check its session entry and backlog before starting.
 
 - **Session:** —
-- **Task:** none — no session in progress. Last completed: Session 7 (2026-07-23) — structured `OpenQuestion` (ADR-9 first slice); see `../reviews/2026-07-23-review-7.md`. Recommended next: the `AnalysisStep` registry (owns the `resolves_with` slugs, computes the "next investigation" queue, wires first steps DNS/IP-ASN against a persisted investigation).
+- **Task:** none — no session in progress. Last completed: Session 8 (2026-07-23) — Windows E2E validation + cp1252 Unicode fix; see `../reviews/2026-07-23-review-8.md`. Recommended next: the `AnalysisStep` registry (owns the `resolves_with` slugs, computes the "next investigation" queue, wires first steps DNS/IP-ASN against a persisted investigation).
 - **Status:** idle

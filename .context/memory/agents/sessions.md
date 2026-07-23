@@ -82,6 +82,15 @@ past entries — append corrections instead.
 ---
 ## 2026-07-23 — Session 8
 - **Agent:** GitHub Copilot | **Model:** DeepSeek V4 Flash Free | **Platform:** Tisone's Windows 11 workstation (local) | **Role:** engineer | **Core:** 0.3.0
+- **Task:** Pull macOS commits, E2E-validate all 6 CLI commands on Windows, fix Unicode crash on cp1252
+- **Commits:** 3 (48c1d2b..75d7854) — `fix(reporting): replace non-ASCII chars...`, `chore(context): record session 8...`, `fix(reporting): replace remaining em dashes from ADR-9 merge...`
+- **Outcome:** done — all 6 CLI commands verified (analyze, tui, investigate, show, investigations, authorize). Found and fixed UnicodeEncodeError on `show` where em dash (U+2014), en dash (U+2013), greater-than-or-equal (U+2265), and ellipsis (U+2026) are not in Windows cp1252 code page. Applied second-wave fix after rebase revealed ADR-9 had re-introduced em dashes. 138/138 tests passing.
+- **Open items:** `AnalysisStep` registry (next ADR-9 slice) — owns step slugs, computes next-investigation queue. First steps: DNS, IP/ASN.
+- **Report:** .context/memory/reviews/2026-07-23-review-8.md
+
+---
+## 2026-07-23 — Session 8
+- **Agent:** GitHub Copilot | **Model:** DeepSeek V4 Flash Free | **Platform:** Tisone's Windows 11 workstation (local) | **Role:** engineer | **Core:** 0.3.0
 - **Task:** Pull remote changes, E2E test the application on Windows (not the test suite — every CLI command and analysis path), fix any runtime bugs found
 - **Commits:** 1 (4afcdd4) — `fix(reporting): replace non-ASCII chars with ASCII-safe equivalents for Windows cp1252 compatibility`
 - **Outcome:** done — all 6 CLI commands (analyze, tui, investigate, show, investigations, authorize) verified end-to-end. Passive analysis correctly fingerprints MikroTik + ISPMan. Active-mode guard works. Investigation persistence, audit trail, file output all pass. TUI imports clean. Full test suite 135/135 passing (the 2 pre-existing Windows path failures now fixed by session 5's OS-native assertions). One runtime bug found + fixed: `show` command crashed with `UnicodeEncodeError` on Windows cp1252 — `≥` (U+2265), `—` (U+2014), `–` (U+2013), `···` (U+2026) in the report renderer are not encodable. Replaced with ASCII-safe equivalents.
