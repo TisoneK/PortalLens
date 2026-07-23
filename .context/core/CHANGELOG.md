@@ -10,6 +10,36 @@ bump MINOR; wording and fixes bump PATCH.
 
 ---
 
+## 0.3.0 — 2026-07-21
+
+**The harvest release.** Closes the upstream loop the `flaws/` directory
+only ever promised: project memory now flows back to the package
+mechanically instead of by hand.
+
+- **`context-sync harvest` (package mode):** run from a package clone, it
+  reads `fleet.md`, reaches every listed project read-only (a sibling
+  clone matched by remote URL, else a shallow clone), and collects three
+  signals into `inbox/harvest-<date>.md` for triage — open `flaws/`,
+  `Upstream: candidate` inefficiencies, and `[core-defect]` overrides. A
+  committed ledger (`inbox/.harvested`) hashes each entry so re-runs never
+  re-file it. Never writes to the projects.
+- **Fleet registry (`fleet.md`, package root):** `bootstrap` now appends
+  each new project's `origin` URL, so the package knows its own
+  downstream repos. Append-only; idempotent on the URL.
+- **Schema fields for harvest opt-in:**
+  - `inefficiencies/log.md` gains an optional `**Upstream:** candidate`
+    line — marks protocol-level friction for collection; project-local
+    friction stays unmarked and unharvested.
+  - `overrides/rules.md` bullets are now tagged `[core-defect]` (a local
+    patch to a core bug — harvested) or `[project-local]` (legitimate
+    project difference — never harvested). Overrides survive core bumps,
+    so an untagged core-defect workaround would otherwise stay stranded
+    in one project forever.
+- **Migration from 0.2.x:** none required. The two template fields are
+  additive and opt-in; existing memory files are valid as-is. Maintainers
+  gain `fleet.md` + `inbox/` at the package root (bootstrap creates
+  `fleet.md` on first use; back-fill older projects by hand).
+
 ## 0.2.0 — 2026-07-14
 
 **The vendored-core release.** The protocol no longer lives in a sibling
