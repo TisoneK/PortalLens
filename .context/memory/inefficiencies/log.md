@@ -91,3 +91,15 @@ if literally nothing slowed you down.
 - **Cause:** n/a.
 - **Workaround / fix:** n/a.
 - **Prevent next time:** When changing a model field's type, grep every reference first and migrate all consumers in one pass. The TUI (an optional-extra consumer) is the easy one to forget — it broke in no way only because the grep caught `tui/widgets.py`.
+
+---
+## 2026-07-23 — GitHub Copilot / DeepSeek V4 Flash Free (Session 8)
+- **Problem:** `portallens show <id>` crashes on Windows with `UnicodeEncodeError: 'charmap' codec can't encode character '\u2265'`. The report renderer in `reporting/__init__.py` uses Unicode characters (`≥` for ranges, `—` for em-dashes, `–` for en-dashes, `…` for ellipsis) that aren't in the Windows cp1252 code page. `click.echo()` writes to stdout via `sys.stdout.write()`, which on Windows uses the console's active code page (typically cp1252 for Western European locales).
+- **Cost:** ~5 min — discovered by running `show` on the saved investigation after `investigate` + `investigations` both worked. Root-caused by checking the stack trace, identifying all non-ASCII chars in the renderer, and replacing them with ASCII-safe alternatives (`>=`, `-`, `...`).
+- **Cause:** The report renderer was authored on macOS/Linux where UTF-8 is the default encoding. Unicode chars render fine there. Windows defaults to a legacy code page (cp1252) for stdout, which cannot encode U+2265 and friends. No `encoding="utf-8"` override or stream wrapper was in place.
+- **Workaround / fix:** Replaced all non-ASCII chars with ASCII equivalents in `src/portallens/reporting/__init__.py`:
+  - `≥` → `>=` (range prefix)
+  - `—` → `-` (em-dash separators in table cells and prose)
+  - `–` → `-` (en-dash in range "0–19" → "0-19")
+  - `···` → `...` (ellipsis in redact)
+- **Prevent next time:** When writing output that goes through `click.echo()` (which writes to `sys.stdout`), stick to ASCII printable chars unless the code explicitly sets `sys.stdout.reconfigure(encoding="utf-8")`. This is especially relevant for cross-platform libraries where macOS/Linux devs won't notice the bug. A project-wide linter rule (e.g. Ruff's `RUF001`/`RUF002`/`RUF003` — already in the config as ignored) could catch non-ASCII in format strings if re-enabled for the reporting module.

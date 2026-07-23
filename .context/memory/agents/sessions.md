@@ -78,3 +78,12 @@ past entries — append corrections instead.
 - **Outcome:** done — `OpenQuestion` in `portal.py`; analyzer emits structured questions (upstream carries `UPSTREAM_OF`; documented-only signature questions carry empty `resolves_with` deliberately); Markdown renderer prints `Resolves with:`; TUI panel shows a `next:` hint (with `rich.markup.escape`). Investigation store unchanged — pydantic JSON round-trips it for free (ADR-8 prediction held). 135 → 138 tests; ruff + mypy clean; verified the structured questions survive the SQLite persist/reload across processes.
 - **Open items:** `AnalysisStep` registry (next ADR-9 slice) — owns the step slugs, computes the "next investigation" queue, wires first steps (DNS, IP/ASN) against a persisted investigation using the already-built `Investigation.is_authorized(...)` seam. Add a test that every emitted `resolves_with` slug is a registered step.
 - **Report:** .context/memory/reviews/2026-07-23-review-7.md
+
+---
+## 2026-07-23 — Session 8
+- **Agent:** GitHub Copilot | **Model:** DeepSeek V4 Flash Free | **Platform:** Tisone's Windows 11 workstation (local) | **Role:** engineer | **Core:** 0.3.0
+- **Task:** Pull remote changes, E2E test the application on Windows (not the test suite — every CLI command and analysis path), fix any runtime bugs found
+- **Commits:** 1 (4afcdd4) — `fix(reporting): replace non-ASCII chars with ASCII-safe equivalents for Windows cp1252 compatibility`
+- **Outcome:** done — all 6 CLI commands (analyze, tui, investigate, show, investigations, authorize) verified end-to-end. Passive analysis correctly fingerprints MikroTik + ISPMan. Active-mode guard works. Investigation persistence, audit trail, file output all pass. TUI imports clean. Full test suite 135/135 passing (the 2 pre-existing Windows path failures now fixed by session 5's OS-native assertions). One runtime bug found + fixed: `show` command crashed with `UnicodeEncodeError` on Windows cp1252 — `≥` (U+2265), `—` (U+2014), `–` (U+2013), `···` (U+2026) in the report renderer are not encodable. Replaced with ASCII-safe equivalents.
+- **Open items:** Pre-existing path failures resolved (by pulled commit). Structured `OpenQuestion` (ADR-9) implemented by Session 7; next build per that session: `AnalysisStep` registry.
+- **Report:** none (bug fix + verification only — see the reporting module diff)
