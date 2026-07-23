@@ -42,6 +42,7 @@ from collections.abc import Sequence
 
 import click
 
+from portallens.output import echo
 from portallens.plugins.captive_wifi import CaptiveWifiPortal  # noqa: F401 — registers the plugin
 from portallens.portal import AcquisitionPolicy, AnalysisContext, PortalReport, PortalType
 from portallens.registry import get_portal_class
@@ -71,12 +72,12 @@ def _run_analysis(
     """
 
     if not urls:
-        click.echo("Error: at least one URL is required.", err=True)
+        echo("Error: at least one URL is required.", err=True)
         sys.exit(2)
 
     # Active-mode guard — require explicit authorization confirmation.
     if (fetch_urls or resolve_dns) and not authorization_confirmed:
-        click.echo(
+        echo(
             "Active analysis (--fetch-urls / --resolve-dns) requires explicit "
             "authorization for every URL supplied.\n"
             "Re-run with --i-have-authorization if you have it.",
@@ -100,7 +101,7 @@ def _run_analysis(
     try:
         portal_cls = get_portal_class(ptype)
     except KeyError as exc:
-        click.echo(str(exc), err=True)
+        echo(str(exc), err=True)
         sys.exit(2)
 
     portal = portal_cls()
@@ -219,7 +220,7 @@ def main(ctx: click.Context) -> None:
 
     if ctx.invoked_subcommand is None:
         # `portallens` with no args at all — show help.
-        click.echo(ctx.get_help())
+        echo(ctx.get_help())
 
 
 @main.command(name="analyze")
@@ -265,9 +266,9 @@ def analyze(
         from pathlib import Path
 
         Path(output).write_text(markdown, encoding="utf-8")
-        click.echo(f"Report written to {output}", err=True)
+        echo(f"Report written to {output}", err=True)
     else:
-        click.echo(markdown)
+        echo(markdown)
 
 
 @main.command(name="tui")
@@ -308,7 +309,7 @@ def tui(
     try:
         from portallens.tui import PortalLensApp
     except ImportError as exc:
-        click.echo(
+        echo(
             "The TUI requires the 'tui' extra. Install it with:\n"
             "    pip install -e \".[tui]\"\n"
             f"(underlying import error: {exc})",
@@ -375,11 +376,11 @@ def investigate(
 
     fp = report.strongest_fingerprint()
     headline = f"{fp.platform} ({fp.confidence}%)" if fp else "no platform fingerprint"
-    click.echo(f"Investigation saved: {investigation.id}")
-    click.echo(f"  Target:   {investigation.target}")
-    click.echo(f"  Strongest fingerprint: {headline}")
-    click.echo(f"  Relationships: {len(report.relationships)} | Open questions: {len(report.open_questions)}")
-    click.echo(f"\nInspect it:  portallens show {investigation.id}")
+    echo(f"Investigation saved: {investigation.id}")
+    echo(f"  Target:   {investigation.target}")
+    echo(f"  Strongest fingerprint: {headline}")
+    echo(f"  Relationships: {len(report.relationships)} | Open questions: {len(report.open_questions)}")
+    echo(f"\nInspect it:  portallens show {investigation.id}")
 
 
 @main.command(name="investigations")
@@ -393,13 +394,13 @@ def investigations(db_path: str | None) -> None:
         summaries = store.list()
 
     if not summaries:
-        click.echo("No investigations saved yet. Create one with `portallens investigate <url>`.")
+        echo("No investigations saved yet. Create one with `portallens investigate <url>`.")
         return
 
     for s in summaries:
-        click.echo(f"{s.id}")
-        click.echo(f"    target:  {s.target}")
-        click.echo(f"    type:    {s.portal_type.value}    updated: {s.updated_at.isoformat(timespec='seconds')}")
+        echo(f"{s.id}")
+        echo(f"    target:  {s.target}")
+        echo(f"    type:    {s.portal_type.value}    updated: {s.updated_at.isoformat(timespec='seconds')}")
 
 
 @main.command(name="show")
@@ -415,21 +416,21 @@ def show(investigation_id: str, audit: bool, db_path: str | None) -> None:
         investigation = store.get(investigation_id)
 
     if investigation is None:
-        click.echo(f"No investigation with id {investigation_id!r}.", err=True)
+        echo(f"No investigation with id {investigation_id!r}.", err=True)
         sys.exit(1)
 
     if not audit:
-        click.echo(render_markdown(investigation.report))
+        echo(render_markdown(investigation.report))
         return
 
-    click.echo(f"# Audit trail - {investigation.id}")
-    click.echo(f"\nTarget: {investigation.target}")
-    click.echo(f"Created: {investigation.created_at.isoformat(timespec='seconds')}")
+    echo(f"# Audit trail - {investigation.id}")
+    echo(f"\nTarget: {investigation.target}")
+    echo(f"Created: {investigation.created_at.isoformat(timespec='seconds')}")
     granted = ", ".join(sorted(investigation.authorized_techniques)) or "none"
-    click.echo(f"Authorized techniques: {granted}")
-    click.echo("\n## Log")
+    echo(f"Authorized techniques: {granted}")
+    echo("\n## Log")
     for entry in investigation.audit_log:
-        click.echo(f"  [{entry.at.isoformat(timespec='seconds')}] {entry.kind}: {entry.detail}")
+        echo(f"  [{entry.at.isoformat(timespec='seconds')}] {entry.kind}: {entry.detail}")
 
 
 @main.command(name="authorize")
@@ -454,16 +455,16 @@ def authorize(investigation_id: str, technique: str, note: str | None, db_path: 
     with InvestigationStore(db_path) as store:
         investigation = store.get(investigation_id)
         if investigation is None:
-            click.echo(f"No investigation with id {investigation_id!r}.", err=True)
+            echo(f"No investigation with id {investigation_id!r}.", err=True)
             sys.exit(1)
         try:
             grant = investigation.authorize(technique, note=note)
         except ValueError as exc:
-            click.echo(f"Error: {exc}", err=True)
+            echo(f"Error: {exc}", err=True)
             sys.exit(2)
         store.save(investigation)
 
-    click.echo(
+    echo(
         f"Authorization recorded for {grant.technique!r} on {investigation.id} "
         f"at {grant.granted_at.isoformat(timespec='seconds')}."
     )
