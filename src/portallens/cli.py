@@ -153,6 +153,16 @@ _NOTES_OPTION = click.option(
     default=None,
     help="Free-text notes to attach to the analysis context (e.g. 'captured from Android Chrome').",
 )
+_DB_OPTION = click.option(
+    "--db",
+    "db_path",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help=(
+        "Path to the investigations database. Defaults to $PORTALLENS_DB, else "
+        "$XDG_DATA_HOME/portallens/investigations.db (see ADR-8)."
+    ),
+)
 
 
 class _DefaultAnalyzeGroup(click.Group):
@@ -310,6 +320,153 @@ def tui(
     # run() blocks until the user quits. run_async() would await; the
     # CLI is synchronous so run() is correct here.
     app.run()
+
+
+# ---------------------------------------------------------------------------
+# Investigation persistence (ADR-8) — create, list, show, authorize.
+# These operate on the SQLite store; `investigate` runs step-zero analysis
+# and persists the result, the rest read/update stored investigations.
+# ---------------------------------------------------------------------------
+
+
+@main.command(name="investigate")
+@click.argument("urls", nargs=-1, required=True)
+@_PORTAL_TYPE_OPTION
+@_FETCH_OPTION
+@_FOLLOW_REDIRECTS_OPTION
+@_RESOLVE_DNS_OPTION
+@_AUTH_OPTION
+@_NOTES_OPTION
+@_DB_OPTION
+def investigate(
+    urls: tuple[str, ...],
+    portal_type: str,
+    fetch_urls: bool,
+    follow_redirects: bool,
+    resolve_dns: bool,
+    authorization_confirmed: bool,
+    notes: str | None,
+    db_path: str | None,
+) -> None:
+    """Analyze portal URLs and save the result as a persisted investigation.
+
+    Prints the new investigation's id. Inspect it later with
+    `portallens show <id>` — the analysis outlives the process.
+    """
+
+    from portallens.investigation import Investigation, InvestigationStore
+
+    report = _run_analysis(
+        urls=urls,
+        portal_type=portal_type,
+        fetch_urls=fetch_urls,
+        follow_redirects=follow_redirects,
+        resolve_dns=resolve_dns,
+        authorization_confirmed=authorization_confirmed,
+        notes=notes,
+    )
+    investigation = Investigation.start(
+        report,
+        portal_type=PortalType(portal_type.lower()),
+        user_notes=notes,
+    )
+    with InvestigationStore(db_path) as store:
+        store.save(investigation)
+
+    fp = report.strongest_fingerprint()
+    headline = f"{fp.platform} ({fp.confidence}%)" if fp else "no platform fingerprint"
+    click.echo(f"Investigation saved: {investigation.id}")
+    click.echo(f"  Target:   {investigation.target}")
+    click.echo(f"  Strongest fingerprint: {headline}")
+    click.echo(f"  Relationships: {len(report.relationships)} · Open questions: {len(report.open_questions)}")
+    click.echo(f"\nInspect it:  portallens show {investigation.id}")
+
+
+@main.command(name="investigations")
+@_DB_OPTION
+def investigations(db_path: str | None) -> None:
+    """List saved investigations, newest first."""
+
+    from portallens.investigation import InvestigationStore
+
+    with InvestigationStore(db_path) as store:
+        summaries = store.list()
+
+    if not summaries:
+        click.echo("No investigations saved yet. Create one with `portallens investigate <url>`.")
+        return
+
+    for s in summaries:
+        click.echo(f"{s.id}")
+        click.echo(f"    target:  {s.target}")
+        click.echo(f"    type:    {s.portal_type.value}    updated: {s.updated_at.isoformat(timespec='seconds')}")
+
+
+@main.command(name="show")
+@click.argument("investigation_id")
+@click.option("--audit", is_flag=True, default=False, help="Show the audit log and authorizations instead of the report.")
+@_DB_OPTION
+def show(investigation_id: str, audit: bool, db_path: str | None) -> None:
+    """Render a saved investigation's report (or, with --audit, its trail)."""
+
+    from portallens.investigation import InvestigationStore
+
+    with InvestigationStore(db_path) as store:
+        investigation = store.get(investigation_id)
+
+    if investigation is None:
+        click.echo(f"No investigation with id {investigation_id!r}.", err=True)
+        sys.exit(1)
+
+    if not audit:
+        click.echo(render_markdown(investigation.report))
+        return
+
+    click.echo(f"# Audit trail — {investigation.id}")
+    click.echo(f"\nTarget: {investigation.target}")
+    click.echo(f"Created: {investigation.created_at.isoformat(timespec='seconds')}")
+    granted = ", ".join(sorted(investigation.authorized_techniques)) or "none"
+    click.echo(f"Authorized techniques: {granted}")
+    click.echo("\n## Log")
+    for entry in investigation.audit_log:
+        click.echo(f"  [{entry.at.isoformat(timespec='seconds')}] {entry.kind}: {entry.detail}")
+
+
+@main.command(name="authorize")
+@click.argument("investigation_id")
+@click.option(
+    "--technique",
+    required=True,
+    help="The active technique you assert authorization for (e.g. fetch_urls, resolve_dns).",
+)
+@click.option("--note", default=None, help="Optional note recorded with the authorization.")
+@_DB_OPTION
+def authorize(investigation_id: str, technique: str, note: str | None, db_path: str | None) -> None:
+    """Record, per ADR-10, that you assert authorization for one active technique.
+
+    The assertion is timestamped and appended to the investigation's audit
+    trail. It does not itself run anything — it is the recorded authorization
+    a later active step checks against.
+    """
+
+    from portallens.investigation import InvestigationStore
+
+    with InvestigationStore(db_path) as store:
+        investigation = store.get(investigation_id)
+        if investigation is None:
+            click.echo(f"No investigation with id {investigation_id!r}.", err=True)
+            sys.exit(1)
+        try:
+            grant = investigation.authorize(technique, note=note)
+        except ValueError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(2)
+        store.save(investigation)
+
+    click.echo(
+        f"Authorization recorded for {grant.technique!r} on {investigation.id} "
+        f"at {grant.granted_at.isoformat(timespec='seconds')}."
+    )
 
 
 if __name__ == "__main__":
