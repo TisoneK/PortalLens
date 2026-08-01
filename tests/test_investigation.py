@@ -88,13 +88,14 @@ class TestInvestigationModel:
 
     def test_active_techniques_tracks_acquisition_policy(self) -> None:
         # The valid technique set is derived from AcquisitionPolicy, so it
-        # stays correct as ADR-13 adds flags. Assert the current five.
+        # stays correct as ADR-13 adds flags. Assert the current six.
         assert set(ACTIVE_TECHNIQUES) == {
             "fetch_urls",
             "follow_redirects",
             "resolve_dns",
             "probe_tls",
             "port_scan",
+            "use_osint_apis",
         }
 
 

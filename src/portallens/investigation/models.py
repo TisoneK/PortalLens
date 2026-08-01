@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
+from portallens.evidence import Evidence
 from portallens.portal import AcquisitionPolicy, PortalReport, PortalType
 
 
@@ -137,6 +138,23 @@ class Investigation(BaseModel):
     # ------------------------------------------------------------------
     # Audit + authorization
     # ------------------------------------------------------------------
+
+    def append_evidence(self, evidence: list[Evidence], *, step: str) -> None:
+        """Append analysis-step evidence to the report (ADR-9).
+
+        ``step`` is the slug of the :class:`~portallens.steps.registry.AnalysisStep`
+        that produced the evidence — it lands in the audit log so the trail
+        records *what* was appended, *when*, and *by which step*. Bumps
+        ``updated_at`` like any other mutation.
+        """
+
+        if not evidence:
+            return
+        self.report.evidence.extend(evidence)
+        self.record(
+            "step",
+            f"Analysis step {step!r} appended {len(evidence)} evidence records.",
+        )
 
     def record(self, kind: str, detail: str) -> AuditEntry:
         """Append an entry to the audit log and bump ``updated_at``."""

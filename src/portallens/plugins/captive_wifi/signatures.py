@@ -44,25 +44,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from urllib.parse import urlparse
 
+from portallens.provenance import Provenance as Provenance
+
 
 class SignatureLayer(str, Enum):
     """Which layer of the captive-portal stack a signature identifies."""
 
     GATEWAY = "gateway"
     HOSTED_PLATFORM = "hosted_platform"
-
-
-class Provenance(str, Enum):
-    """How well-established a signature's rule is.
-
-    ``VALIDATED`` means a real captured URL matching this signature lives in
-    this repo's test fixtures. ``DOCUMENTED`` means the rule was transcribed
-    from vendor documentation and has not been checked against a captured
-    sample — it can still fire, but the report says so.
-    """
-
-    VALIDATED = "validated against a captured URL in this repo's fixtures"
-    DOCUMENTED = "transcribed from vendor documentation — not yet validated against a captured URL"
 
 
 @dataclass(frozen=True)

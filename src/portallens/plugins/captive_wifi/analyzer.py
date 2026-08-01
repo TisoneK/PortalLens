@@ -33,6 +33,7 @@ from portallens.portal import (
     PortalType,
     RelationshipKind,
 )
+from portallens.security.checks import run_checks
 
 # Analysis-step slugs a question can be resolved by (ADR-9). These are plain
 # strings until the AnalysisStep registry (a later slice) owns them; `resolve_dns`,
@@ -137,7 +138,14 @@ class CaptiveWifiPortal(Portal):
         # ------------------------------------------------------------------
         # 5. Open questions — gaps the evidence can't close.
         # ------------------------------------------------------------------
-        open_questions.extend(self._open_questions(primary_hints, fingerprint_matches, relationships))
+        open_questions.extend(self._open_questions(primary_hints, fingerprint_matches, relationships, evidence))
+
+        # ------------------------------------------------------------------
+        # 6. Security findings — run the SecurityCheck registry (ADR-11)
+        # over whatever evidence this analysis holds. Passive by default;
+        # an active pass (NetAudit) appends probe evidence and re-runs.
+        # ------------------------------------------------------------------
+        findings = run_checks(evidence)
 
         return PortalReport(
             portal_type=self.portal_type,
@@ -156,6 +164,7 @@ class CaptiveWifiPortal(Portal):
             ],
             relationships=relationships,
             open_questions=open_questions,
+            findings=findings,
         )
 
     # ----------------------------------------------------------------------
@@ -413,6 +422,7 @@ class CaptiveWifiPortal(Portal):
         hints: CaptivePortalURLHints,
         fingerprints: list[FingerprintMatch],
         relationships: list[PortalRelationship],
+        evidence: list[Evidence],
     ) -> list[OpenQuestion]:
         """Open questions — gaps the evidence can't close, as structured records.
 
@@ -478,8 +488,12 @@ class CaptiveWifiPortal(Portal):
             )
 
         # Gateway admin exposure — one question per detected gateway, since
-        # each vendor exposes a different administrative surface.
+        # each vendor exposes a different administrative surface. Skipped when
+        # the NetAudit probe already answered it (SERVICE_REACHABLE evidence
+        # makes the gateway_admin_exposed finding fire instead).
         for gateway in hints.gateways:
+            if _has_service_reachable(evidence):
+                continue
             questions.append(
                 OpenQuestion(
                     subject=gateway.platform,
@@ -513,3 +527,9 @@ class CaptiveWifiPortal(Portal):
                 )
 
         return questions
+
+
+def _has_service_reachable(evidence: list[Evidence]) -> bool:
+    """True if the evidence already contains an authorized probe result."""
+
+    return any(ev.type is EvidenceType.SERVICE_REACHABLE for ev in evidence)

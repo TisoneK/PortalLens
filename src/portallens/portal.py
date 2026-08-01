@@ -36,6 +36,39 @@ class PortalType(str, Enum):
     ISP = "isp"                  # reserved
 
 
+class Severity(str, Enum):
+    """Impact level of a security finding (ADR-11 disclosure schema)."""
+
+    INFO = "info"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class SecurityFinding(BaseModel):
+    """A single security finding — the disclosure record ADR-11 mandates.
+
+    Every finding carries the disclosure schema from the user's preferences:
+    Title, Affected asset, Evidence, Impact, Confidence, Recommended
+    remediation, and Verification status. ``confidence`` uses the same
+    ``[0, 100]`` rubric as every other PortalLens claim; ``verification_status``
+    reflects whether the check's rule has been validated against a real
+    capture (``Provenance``) or is provisional.
+    """
+
+    check_slug: str
+    title: str
+    severity: Severity
+    confidence: int = Field(ge=0, le=100)
+    affected: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    impact: str
+    remediation: str
+    verification_status: str
+    note: str | None = None
+
+
 class RelationshipKind(str, Enum):
     """How two portals / services relate to each other.
 
@@ -70,11 +103,17 @@ class AcquisitionPolicy:
     resolve_dns: bool = False
     probe_tls: bool = False
     port_scan: bool = False
+    use_osint_apis: bool = False  # ADR-13 Tier-1: third-party OSINT (CT logs, ASN/RIPEstat) — leaves the machine, does NOT touch the target
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_passive(self) -> bool:
-        """True iff no active technique is enabled."""
+        """True iff no active technique is enabled.
+
+        ADR-13 note: ``use_osint_apis`` touches third parties (leaves the
+        machine) even though it never touches the target, so it is neither
+        ``is_passive`` nor target-facing-active — it is its own middle tier.
+        """
 
         return not any(
             (
@@ -83,6 +122,7 @@ class AcquisitionPolicy:
                 self.resolve_dns,
                 self.probe_tls,
                 self.port_scan,
+                self.use_osint_apis,
             )
         )
 
@@ -186,6 +226,7 @@ class PortalReport(BaseModel):
     fingerprints: list[PortalFingerprint] = Field(default_factory=list)
     relationships: list[PortalRelationship] = Field(default_factory=list)
     open_questions: list[OpenQuestion] = Field(default_factory=list)
+    findings: list[SecurityFinding] = Field(default_factory=list)
 
     def evidence_by_id(self, evidence_id: str) -> Evidence | None:
         for ev in self.evidence:
@@ -200,6 +241,9 @@ class PortalReport(BaseModel):
         if not self.fingerprints:
             return None
         return max(self.fingerprints, key=lambda f: f.confidence)
+
+    def findings_for_check(self, check_slug: str) -> list[SecurityFinding]:
+        return [f for f in self.findings if f.check_slug == check_slug]
 
     def summary_confidence(self, statement_substring: str) -> Confidence | None:
         """Return the highest confidence attached to any observation

@@ -62,6 +62,7 @@ def _run_analysis(
     fetch_urls: bool,
     follow_redirects: bool,
     resolve_dns: bool,
+    port_scan: bool,
     authorization_confirmed: bool,
     notes: str | None,
 ) -> PortalReport:
@@ -76,10 +77,11 @@ def _run_analysis(
         sys.exit(2)
 
     # Active-mode guard — require explicit authorization confirmation.
-    if (fetch_urls or resolve_dns) and not authorization_confirmed:
+    active = any((fetch_urls, follow_redirects, resolve_dns, port_scan))
+    if active and not authorization_confirmed:
         echo(
-            "Active analysis (--fetch-urls / --resolve-dns) requires explicit "
-            "authorization for every URL supplied.\n"
+            "Active analysis (--fetch-urls / --follow-redirects / --resolve-dns / "
+            "--port-scan) requires explicit authorization for every URL supplied.\n"
             "Re-run with --i-have-authorization if you have it.",
             err=True,
         )
@@ -89,6 +91,7 @@ def _run_analysis(
         fetch_urls=fetch_urls,
         follow_redirects=follow_redirects,
         resolve_dns=resolve_dns,
+        port_scan=port_scan,
     )
 
     context = AnalysisContext(
@@ -105,7 +108,16 @@ def _run_analysis(
         sys.exit(2)
 
     portal = portal_cls()
-    return portal.analyze(context)
+    report = portal.analyze(context)
+
+    # NetAudit pass (ADR-12): when the policy enables active probing, run the
+    # authorized active-assessment over the report's observed hosts and merge
+    # the probe evidence + findings back into the report. OSINT (RIPEstat)
+    # is NOT part of this pass — it runs as a `portallens step` against a
+    # persisted investigation, per ADR-9/13.
+    if port_scan:
+        report = _run_netaudit(report, policy)
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +131,7 @@ _PORTAL_TYPE_OPTION = click.option(
     type=click.Choice([t.value for t in PortalType], case_sensitive=False),
     default=PortalType.CAPTIVE_WIFI.value,
     show_default=True,
-    help="Portal type to analyze as. Defaults to captive_wifi — the only implemented plugin today.",
+    help="Portal type to analyze as. Defaults to captive_wifi - the only implemented plugin today.",
 )
 _FETCH_OPTION = click.option(
     "--fetch-urls",
@@ -139,6 +151,12 @@ _RESOLVE_DNS_OPTION = click.option(
     default=False,
     help="Enable active DNS resolution. Requires --i-have-authorization.",
 )
+_PORT_SCAN_OPTION = click.option(
+    "--port-scan",
+    is_flag=True,
+    default=False,
+    help="Enable active admin-port probing (NetAudit). Requires --i-have-authorization.",
+)
 _AUTH_OPTION = click.option(
     "--i-have-authorization",
     "authorization_confirmed",
@@ -146,7 +164,8 @@ _AUTH_OPTION = click.option(
     default=False,
     help=(
         "Confirm you have authorization for active analysis of every URL supplied. "
-        "Required when --fetch-urls or --resolve-dns is set."
+        "Required when any active flag (--fetch-urls / --resolve-dns / --port-scan) is set. "
+        "OSINT-only techniques (RIPEstat) run per-step via `portallens authorize + step`."
     ),
 )
 _NOTES_OPTION = click.option(
@@ -164,6 +183,57 @@ _DB_OPTION = click.option(
         "$XDG_DATA_HOME/portallens/investigations.db (see ADR-8)."
     ),
 )
+_FORMAT_OPTION = click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["markdown", "sarif"], case_sensitive=False),
+    default="markdown",
+    show_default=True,
+    help="Output format: Markdown (human) or SARIF 2.1.0 (machine).",
+)
+
+
+def _render(report: PortalReport, output_format: str) -> str:
+    """Render ``report`` in the requested format."""
+
+    if output_format.lower() == "sarif":
+        from portallens.reporting import render_sarif
+
+        return render_sarif(report)
+    return render_markdown(report)
+
+
+def _run_netaudit(report: PortalReport, policy: AcquisitionPolicy) -> PortalReport:
+    """Run the authorized active-assessment pass and merge its results.
+
+    Only runs when the policy enables an active technique NetAudit knows
+    about (admin-port probing today). The probe evidence and any findings
+    it produces are appended to the passive report.
+    """
+
+    from portallens.security.audit import run_netaudit
+    from portallens.steps.registry import hosts_from_report
+
+    hosts = hosts_from_report(report)
+    if not hosts:
+        return report
+    result = run_netaudit(hosts, policy)
+    if not result.evidence and not result.findings:
+        return report
+
+    from portallens.steps import refine_open_questions
+
+    merged_evidence = [*report.evidence, *result.evidence]
+    return report.model_copy(
+        update={
+            "evidence": merged_evidence,
+            "findings": [*report.findings, *result.findings],
+            # Probe evidence answers the admin-exposure open question — close
+            # it so the report doesn't keep asking what the probe answered
+            # (ADR-9 loop closure).
+            "open_questions": refine_open_questions(report.open_questions, merged_evidence),
+        }
+    )
 
 
 class _DefaultAnalyzeGroup(click.Group):
@@ -229,8 +299,10 @@ def main(ctx: click.Context) -> None:
 @_FETCH_OPTION
 @_FOLLOW_REDIRECTS_OPTION
 @_RESOLVE_DNS_OPTION
+@_PORT_SCAN_OPTION
 @_AUTH_OPTION
 @_NOTES_OPTION
+@_FORMAT_OPTION
 @click.option(
     "--output",
     "-o",
@@ -245,11 +317,13 @@ def analyze(
     fetch_urls: bool,
     follow_redirects: bool,
     resolve_dns: bool,
+    port_scan: bool,
     authorization_confirmed: bool,
     output: str | None,
+    output_format: str,
     notes: str | None,
 ) -> None:
-    """Analyze one or more portal URLs and emit a Markdown report."""
+    """Analyze one or more portal URLs and emit a report (Markdown or SARIF)."""
 
     report = _run_analysis(
         urls=urls,
@@ -257,18 +331,19 @@ def analyze(
         fetch_urls=fetch_urls,
         follow_redirects=follow_redirects,
         resolve_dns=resolve_dns,
+        port_scan=port_scan,
         authorization_confirmed=authorization_confirmed,
         notes=notes,
     )
-    markdown = render_markdown(report)
+    rendered = _render(report, output_format)
 
     if output is not None:
         from pathlib import Path
 
-        Path(output).write_text(markdown, encoding="utf-8")
+        Path(output).write_text(rendered, encoding="utf-8")
         echo(f"Report written to {output}", err=True)
     else:
-        echo(markdown)
+        echo(rendered)
 
 
 @main.command(name="tui")
@@ -277,6 +352,7 @@ def analyze(
 @_FETCH_OPTION
 @_FOLLOW_REDIRECTS_OPTION
 @_RESOLVE_DNS_OPTION
+@_PORT_SCAN_OPTION
 @_AUTH_OPTION
 @_NOTES_OPTION
 def tui(
@@ -285,6 +361,7 @@ def tui(
     fetch_urls: bool,
     follow_redirects: bool,
     resolve_dns: bool,
+    port_scan: bool,
     authorization_confirmed: bool,
     notes: str | None,
 ) -> None:
@@ -299,6 +376,7 @@ def tui(
         fetch_urls=fetch_urls,
         follow_redirects=follow_redirects,
         resolve_dns=resolve_dns,
+        port_scan=port_scan,
         authorization_confirmed=authorization_confirmed,
         notes=notes,
     )
@@ -336,6 +414,7 @@ def tui(
 @_FETCH_OPTION
 @_FOLLOW_REDIRECTS_OPTION
 @_RESOLVE_DNS_OPTION
+@_PORT_SCAN_OPTION
 @_AUTH_OPTION
 @_NOTES_OPTION
 @_DB_OPTION
@@ -345,6 +424,7 @@ def investigate(
     fetch_urls: bool,
     follow_redirects: bool,
     resolve_dns: bool,
+    port_scan: bool,
     authorization_confirmed: bool,
     notes: str | None,
     db_path: str | None,
@@ -363,6 +443,7 @@ def investigate(
         fetch_urls=fetch_urls,
         follow_redirects=follow_redirects,
         resolve_dns=resolve_dns,
+        port_scan=port_scan,
         authorization_confirmed=authorization_confirmed,
         notes=notes,
     )
@@ -406,8 +487,9 @@ def investigations(db_path: str | None) -> None:
 @main.command(name="show")
 @click.argument("investigation_id")
 @click.option("--audit", is_flag=True, default=False, help="Show the audit log and authorizations instead of the report.")
+@_FORMAT_OPTION
 @_DB_OPTION
-def show(investigation_id: str, audit: bool, db_path: str | None) -> None:
+def show(investigation_id: str, audit: bool, output_format: str, db_path: str | None) -> None:
     """Render a saved investigation's report (or, with --audit, its trail)."""
 
     from portallens.investigation import InvestigationStore
@@ -420,7 +502,7 @@ def show(investigation_id: str, audit: bool, db_path: str | None) -> None:
         sys.exit(1)
 
     if not audit:
-        echo(render_markdown(investigation.report))
+        echo(_render(investigation.report, output_format))
         return
 
     echo(f"# Audit trail - {investigation.id}")
@@ -467,6 +549,121 @@ def authorize(investigation_id: str, technique: str, note: str | None, db_path: 
     echo(
         f"Authorization recorded for {grant.technique!r} on {investigation.id} "
         f"at {grant.granted_at.isoformat(timespec='seconds')}."
+    )
+
+
+@main.command(name="step")
+@click.argument("investigation_id")
+@click.argument("step_slug")
+@_DB_OPTION
+def step(investigation_id: str, step_slug: str, db_path: str | None) -> None:
+    """Run one registered analysis step against a saved investigation (ADR-9).
+
+    Loads the investigation, checks the step's authorization requirement
+    (ADR-10), runs the step, appends its evidence to the persisted
+    investigation, and saves. This is the "pull the thread" loop:
+
+        portallens authorize <id> --technique resolve_dns
+        portallens step <id> resolve_dns
+        portallens step <id> ip_asn_lookup
+    """
+
+    from portallens.investigation import InvestigationStore
+    from portallens.steps import compute_next_steps, step_for_slug
+
+    with InvestigationStore(db_path) as store:
+        investigation = store.get(investigation_id)
+        if investigation is None:
+            echo(f"No investigation with id {investigation_id!r}.", err=True)
+            sys.exit(1)
+
+        step_ = step_for_slug(step_slug)
+        if step_ is None:
+            available = ", ".join(s.slug for s in compute_next_steps(investigation.report.open_questions)) or "none"
+            echo(
+                f"Unknown analysis step {step_slug!r}. Steps this investigation's "
+                f"open questions name: {available}",
+                err=True,
+            )
+            sys.exit(2)
+
+        if step_.requires and not investigation.is_authorized(step_.requires):
+            echo(
+                f"Step {step_slug!r} requires authorization for {step_.requires!r}, "
+                f"which is not recorded for {investigation.id}.\n"
+                f"Record it first: portallens authorize {investigation.id} "
+                f"--technique {step_.requires}",
+                err=True,
+            )
+            sys.exit(2)
+
+        # Run with exactly the techniques the operator has recorded
+        # authorization for (ADR-10 scope is a set, never implied — ADR-13).
+        # `_policy_for_technique` would enable only the step's `requires`,
+        # which would strand ip_asn_lookup on hostname targets: it needs
+        # resolve_dns too, and only an explicit resolve_dns authorization
+        # may enable it.
+        policy = _policy_for_authorizations(investigation.authorized_techniques)
+        evidence = step_.run(investigation, policy)
+        if evidence:
+            investigation.append_evidence(evidence, step=step_.slug)
+        else:
+            # A step that found nothing is itself audit-worthy (ADR-10):
+            # "resolve_dns ran, returned no records" is defensibility evidence.
+            investigation.record("step", f"Analysis step {step_slug!r} ran and produced no evidence.")
+        # New evidence may fire checks the passive pass didn't see, and may
+        # answer open questions — recompute both so the persisted report is
+        # current (ADR-9 loop closure). The report is the immutable snapshot;
+        # rebuild it rather than mutating in place.
+        from portallens.security.checks import run_checks
+        from portallens.steps import refine_open_questions
+
+        investigation.report = investigation.report.model_copy(
+            update={
+                "findings": run_checks(investigation.report.evidence),
+                "open_questions": refine_open_questions(
+                    investigation.report.open_questions, investigation.report.evidence
+                ),
+            }
+        )
+        store.save(investigation)
+
+        echo(f"Step {step_slug!r} produced {len(evidence)} evidence record(s).")
+        for ev in evidence:
+            echo(f"  [{ev.type.value}] {ev.key}: {ev.value}")
+        # ADR-13 transparency: if the step skipped hostnames for lack of DNS
+        # consent, say so — "produced 0" must never be a silent no-op.
+        if step_.slug == "ip_asn_lookup":
+            from portallens.steps.ip_asn import dnsless_hostnames
+
+            skipped = dnsless_hostnames(investigation, policy)
+            if skipped:
+                echo(
+                    f"  (hostnames skipped - OSINT consent never implies DNS "
+                    f"consent; authorize resolve_dns to resolve then look up: "
+                    f"portallens authorize {investigation.id} --technique resolve_dns. "
+                    f"Skipped: {', '.join(skipped)})"
+                )
+        echo(f"Investigation {investigation.id} updated (audit log appended).")
+
+
+def _policy_for_authorizations(authorized: set[str]) -> AcquisitionPolicy:
+    """Build the policy a step runs under, from recorded authorizations.
+
+    The `step` verb enables exactly the techniques the operator has recorded
+    authorization for (ADR-10: scope is a set). A step may need more than its
+    own ``requires`` slug — ``ip_asn_lookup`` needs ``resolve_dns`` to resolve
+    hostname targets before the ASN lookup — and only an explicit, recorded
+    resolve_dns authorization may enable it (ADR-13: no flag implies another).
+    """
+
+    return AcquisitionPolicy(
+        fetch_urls="fetch_urls" in authorized,
+        follow_redirects="follow_redirects" in authorized,
+        resolve_dns="resolve_dns" in authorized,
+        probe_tls="probe_tls" in authorized,
+        port_scan="port_scan" in authorized,
+        use_osint_apis="use_osint_apis" in authorized,
     )
 
 

@@ -11,6 +11,9 @@ from __future__ import annotations
 
 from portallens.confidence import ConfidenceLabel, _label_for
 from portallens.portal import PortalReport, PortalType
+from portallens.reporting.sarif import render_sarif
+
+__all__ = ["render_markdown", "render_sarif"]
 
 _TYPE_LABELS: dict[PortalType, str] = {
     PortalType.CAPTIVE_WIFI: "Captive Wi-Fi Portal",
@@ -123,6 +126,32 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
                 f"| {rel.kind.value} | `{rel.other}` | "
                 f"{rel.confidence}% ({label.value}) | {ev_ids} |"
             )
+        lines.append("")
+
+    # Security findings — the disclosure records (ADR-11)
+    if report.findings:
+        lines.append("## Security Findings")
+        lines.append("")
+        lines.append(
+            "_Every finding carries the disclosure schema: Title, Affected "
+            "asset, Evidence, Impact, Confidence, Recommended remediation, "
+            "and Verification status._"
+        )
+        lines.append("")
+        for f in sorted(report.findings, key=lambda f: -f.confidence):
+            label = _label_for(f.confidence)
+            lines.append(
+                f"- **[{f.severity.value} | {f.confidence}% ({label.value})] "
+                f"{f.title}**"
+            )
+            lines.append(f"  - Check: `{f.check_slug}`")
+            if f.affected:
+                lines.append(f"  - Affected asset: `{f.affected}`")
+            if f.evidence_ids:
+                lines.append(f"  - Evidence: {', '.join(f.evidence_ids)}")
+            lines.append(f"  - Impact: {f.impact}")
+            lines.append(f"  - Recommended remediation: {f.remediation}")
+            lines.append(f"  - Verification status: {f.verification_status}")
         lines.append("")
 
     # Open questions

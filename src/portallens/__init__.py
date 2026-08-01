@@ -24,6 +24,8 @@ from portallens.portal import (
     PortalReport,
     PortalType,
     RelationshipKind,
+    SecurityFinding,
+    Severity,
 )
 from portallens.registry import get_portal_class, register_portal
 
@@ -43,6 +45,8 @@ __all__ = [
     "PortalReport",
     "PortalType",
     "RelationshipKind",
+    "SecurityFinding",
+    "Severity",
     "__version__",
     "get_portal_class",
     "register_portal",

@@ -38,6 +38,7 @@ class EvidenceType(str, Enum):
     DNS_RECORD = "dns_record"               # a resolved DNS record (A, AAAA, CNAME, TXT, …)
     TLS_CERTIFICATE = "tls_certificate"     # a TLS certificate SAN / issuer / subject field
     IP_ASN = "ip_asn"                       # IP ownership / ASN data
+    SERVICE_REACHABLE = "service_reachable"  # a service was reachable at host:port during authorized probing
     USER_SUPPLIED = "user_supplied"         # the user pasted this in directly
 
 
