@@ -119,3 +119,12 @@ if literally nothing slowed you down.
 - **Cause:** Treating an output-encoding problem as a content problem. The character that fails to encode can originate from input, so it can't be fixed where the static text is written — only where text is emitted.
 - **Workaround / fix:** `portallens/output.py::console_safe(text, encoding)` + `echo()` — encode-test at the single emit boundary, degrade only what the target console can't take (known glyphs -> ASCII stand-ins, catch-all replace for the rest). CLI routes every emit through `echo()`. Commit 2bc6872. The earlier source ASCII edits are now belt-and-suspenders; they can be reverted to nicer Unicode once the concurrent session finishes editing reporting/__init__.py.
 - **Prevent next time:** Encoding/escaping/redaction of *output* belongs at the output boundary, applied to the final string — not scattered across the code that builds it. If output can contain user input (it usually can), the boundary is the ONLY complete place. This generalizes: the same is true of the TUI's rich-markup escaping and the report's secret redaction.
+
+---
+## 2026-08-01 — Buffy / deepseek-v4-flash (Session 9)
+- **Problem:** `agents/sessions.md` contains **two** entries both labelled "Session 8" — two concurrent Windows agents (GitHub Copilot) logged the same day, each numbering itself 8. This session had to be 9, but anyone citing "session 8" from now on must disambiguate by commit range or machine. Minor, but it will keep recurring while the numbering is manual.
+- **Cost:** ~2 min — noticed during Step 3 reading; noted in the session entry and report rather than editing (append-only).
+- **Cause:** The protocol has no session-number allocation mechanism; two sessions on the same repo same-day both read "last was 7" and both claimed 8. Nothing in `.context/` prevented it.
+- **Workaround / fix:** Recorded this session as 9 and flagged the ambiguity; next agents should cite commit SHAs when referencing "session 8". The 0.5.0 `memory/sessions/` module's SUMMARY.md gives a cleaner continuity view for future numbering.
+- **Prevent next time:** When starting a session, count actual entries in `agents/sessions.md` (not the last visible number) before numbering, and cross-check against the most recent date. Worth a flaw entry if it recurs.
+- **Also noted:** `context-sync.ps1` (core 0.4.0/0.5.0) has never been exercised by a real Windows agent — the next Windows session should run it and log the result; the sh-based `verify` is known to break on Windows Git Bash CRLF (logged flaw, session 6).

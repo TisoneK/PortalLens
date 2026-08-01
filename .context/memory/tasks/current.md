@@ -5,6 +5,6 @@ session start (protocol Step 3), clear it at session end (Step 15). If
 you find a stale in-progress entry here, a prior session died mid-task —
 check its session entry and backlog before starting.
 
-- **Session:** 9 (2026-08-01, local macOS agent)
-- **Task:** "Synch .context then initialize portallens" — (1) git pull + `context-sync verify` (done: clean, core 0.3.0 intact); (2) `context-sync update` core 0.3.0 -> 0.5.0 (same MAJOR, source reachable at ../context/core), commit + push; (3) initialize portallens: verify `.venv` + editable install, run baseline health (ruff, mypy, pytest) + CLI smoke.
-- **Status:** in progress
+- **Session:** —
+- **Task:** none — no session in progress. Last completed: Session 9 (2026-08-01) — core sync 0.3.0 → 0.5.0 + portallens initialization; see `../reviews/2026-08-01-review.md`. Recommended next: the `AnalysisStep` registry (owns the `resolves_with` slugs, computes the "next investigation" queue, wires first steps DNS/IP-ASN against a persisted investigation).
+- **Status:** idle

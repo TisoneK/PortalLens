@@ -35,17 +35,18 @@ block (and its "last verified" date) every time you run on it again.
   - System Python may be `externally-managed` — always use a `.venv` for project installs
 
 ---
-## Tisone's macOS workstation (last verified 2026-07-23)
+## Tisone's macOS workstation (last verified 2026-08-01)
 - **Identify by:** repo at `/Users/bao/Code/PortalLens`, Darwin 24.6.0 (macOS 15), local IDE agent (Claude Code), user's own git credentials
 - **OS:** macOS 15 (Darwin 24.6.0), arm64
 - **Runtimes:** system `python3` is **3.9.6** — below this project's `requires-python = ">=3.10"`, so it cannot run PortalLens. Use `/Users/bao/.local/bin/python3.12` (3.12.13). `uv` is also installed at `/Users/bao/.local/bin/uv`. No pyenv, no Homebrew Python on PATH.
 - **Package manager:** pip inside a project `.venv`
 - **Verified commands** (all run successfully on this machine, this project):
   - `python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"` — creates the venv and installs dev deps
-  - `.venv/bin/python -m pytest -q` — 80 passed (session 2)
+  - `.venv/bin/python -m pytest -q` — 146 passed (session 9; 80 in session 2)
   - `.venv/bin/ruff check .` — All checks passed
-  - `.venv/bin/mypy src` — Success, 16 source files
-  - `.venv/bin/portallens "<url>" "<url>"` — renders the Markdown report on stdout
+  - `.venv/bin/mypy src` — Success, 24 source files
+  - `.venv/bin/portallens analyze "<url>" "<url>"` — renders the Markdown report on stdout (verified again session 9 on the real fixture pair)
+  - `sh .context/core/bin/context-sync update` — core 0.3.0 → 0.5.0 applied cleanly (session 9); verify + status pass post-update
   - `git push origin main` — works with the user's existing credentials; no PAT involved (local agent)
 - **Git identity:** repo-local `user.name`/`user.email` set to `Tisone Kironget <tisonkironget@gmail.com>` (the user's real, confirmed identity — see `user/identity.md`) on 2026-07-23. **Before this, NO identity was configured at any scope** (local + global both empty), so git auto-derived `Bao Le <bao@Baos-Mac-mini.local>` from this Mac's OS account — and sessions 2/3/5's commits went out under that name. (A brief intermediate fix set it to `Tisone K <...noreply>`, the stale bootstrap-recorded value; the user corrected it to the real identity.) If `git var GIT_AUTHOR_IDENT` ever shows `bao@Baos-Mac-mini.local` again, the local config was lost — re-run `git config --local user.name "Tisone Kironget" && git config --local user.email "tisonkironget@gmail.com"` (Step 1 of the local edition).
 - **Quirks:**

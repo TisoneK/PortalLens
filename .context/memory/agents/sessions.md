@@ -96,3 +96,12 @@ past entries — append corrections instead.
 - **Outcome:** done — all 6 CLI commands (analyze, tui, investigate, show, investigations, authorize) verified end-to-end. Passive analysis correctly fingerprints MikroTik + ISPMan. Active-mode guard works. Investigation persistence, audit trail, file output all pass. TUI imports clean. Full test suite 135/135 passing (the 2 pre-existing Windows path failures now fixed by session 5's OS-native assertions). One runtime bug found + fixed: `show` command crashed with `UnicodeEncodeError` on Windows cp1252 — `≥` (U+2265), `—` (U+2014), `–` (U+2013), `···` (U+2026) in the report renderer are not encodable. Replaced with ASCII-safe equivalents.
 - **Open items:** Pre-existing path failures resolved (by pulled commit). Structured `OpenQuestion` (ADR-9) implemented by Session 7; next build per that session: `AnalysisStep` registry.
 - **Report:** none (bug fix + verification only — see the reporting module diff)
+
+---
+## 2026-08-01 — Session 9
+- **Agent:** Buffy | **Model:** deepseek-v4-flash (stated in system prompt) | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer | **Core:** 0.5.0
+- **Task:** "Synch .context then initialize portallens" — git pull + context-sync verify/status, update core 0.3.0 → 0.5.0 (same MAJOR, source at ../context/core), regenerate kickoff/AGENTS for the new templates, then initialize portallens (editable install refresh + baseline health + E2E CLI smoke).
+- **Commits:** 4 (9a24df5 lock, e7045ce core 0.5.0, 329e03d regenerated entry files, + this memory log)
+- **Outcome:** done — core synced to 0.5.0 (session-scoped memory release: new `memory/sessions/` module + Context Promotion in Step 17 + Windows `context-sync.ps1` from 0.4.0); kickoff/AGENTS regenerated with facts refilled (identity corrected to Tisone Kironget <tisonkironget@gmail.com>); portallens verified initialized on this Mac — ruff clean, mypy 24 source files, 146/146 tests passing, CLI analyze on the real fixture pair produces the expected report (MikroTik 88% / ISPMan 80%, redirects + platform relationships), TUI imports clean. No product code changed.
+- **Open items:** unchanged — `AnalysisStep` registry (ADR-9 second slice, DNS/IP-ASN first steps) remains the recommended next build; `context-sync.ps1` unexercised by a real Windows agent.
+- **Report:** .context/memory/reviews/2026-08-01-review.md (notes: .context/memory/sessions/2026-08-01-9/notes.md)
