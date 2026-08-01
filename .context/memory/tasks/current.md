@@ -6,5 +6,5 @@ you find a stale in-progress entry here, a prior session died mid-task —
 check its session entry and backlog before starting.
 
 - **Session:** —
-- **Task:** none — no session in progress. Last completed: Session 9 (2026-08-01) — core sync 0.3.0 → 0.5.0 + portallens initialization; see `../reviews/2026-08-01-review.md`. Recommended next: the `AnalysisStep` registry (owns the `resolves_with` slugs, computes the "next investigation" queue, wires first steps DNS/IP-ASN against a persisted investigation).
+- **Task:** none — no session in progress. Last completed: Session 10 (2026-08-01) — security system build (ADR-9/10/11/12/13: AnalysisStep registry + DNS/IP-ASN steps, SecurityCheck registry + three checks, NetAudit, SARIF, CLI step verb); see `../reviews/2026-08-01-review-2.md`. Recommended next: CT-log mining (Tier-1 OSINT) or DisclosureDesk.
 - **Status:** idle

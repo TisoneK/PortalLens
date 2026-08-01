@@ -105,3 +105,12 @@ past entries — append corrections instead.
 - **Outcome:** done — core synced to 0.5.0 (session-scoped memory release: new `memory/sessions/` module + Context Promotion in Step 17 + Windows `context-sync.ps1` from 0.4.0); kickoff/AGENTS regenerated with facts refilled (identity corrected to Tisone Kironget <tisonkironget@gmail.com>); portallens verified initialized on this Mac — ruff clean, mypy 24 source files, 146/146 tests passing, CLI analyze on the real fixture pair produces the expected report (MikroTik 88% / ISPMan 80%, redirects + platform relationships), TUI imports clean. No product code changed.
 - **Open items:** unchanged — `AnalysisStep` registry (ADR-9 second slice, DNS/IP-ASN first steps) remains the recommended next build; `context-sync.ps1` unexercised by a real Windows agent.
 - **Report:** .context/memory/reviews/2026-08-01-review.md (notes: .context/memory/sessions/2026-08-01-9/notes.md)
+
+---
+## 2026-08-01 — Session 10
+- **Agent:** Buffy | **Model:** deepseek-v4-flash (stated in system prompt) | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer | **Core:** 0.5.0
+- **Task:** "Lets build a powerful security system" — the full ADR-9/10/11/12/13 slice: AnalysisStep registry + two real steps, SecurityCheck registry, NetAudit active assessment, SARIF output, CLI `step` verb + `--format sarif` + `--port-scan`
+- **Commits:** 2 — `feat(security): SecurityCheck registry, NetAudit, analysis steps, SARIF (ADR-9..13)` (2a086f3, 25 files, +1999) + this `chore(context): record session 10 - security system build`
+- **Outcome:** done — 146 → 202 tests, ruff + mypy strict clean (34 source files). SecurityCheck registry (client_fingerprinting_preauth, cleartext_login_form, gateway_admin_exposed), NetAudit admin-port probe (ADR-12 assess-only), steps/ registry + resolve_dns + ip_asn_lookup (ADR-13: OSINT consent never implies DNS consent), SARIF 2.1.0 renderer, CLI step verb with per-technique authorization gate. Four real bugs caught by the code reviewer and fixed: `conf.value` int AttributeError, `hosts_from_report` typing (6 test failures), ADR-13 DNS-under-OSINT violation, em-dash cp1252 regression in new CLI output.
+- **Open items:** CT-log mining (Tier-1 OSINT) and DisclosureDesk remain the two big open backlog items; validate the three DOCUMENTED signatures; HTML fingerprinting via registry field.
+- **Report:** .context/memory/reviews/2026-08-01-review-2.md (notes: .context/memory/sessions/2026-08-01-10/notes.md)
