@@ -181,6 +181,7 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - **The ADR-1 architectural invariant stands.** This ADR changes the *consent model*, not the acquisition boundary: `acquisition/fetcher.py` remains the ONLY place PortalLens reaches outside the process, and every active technique still funnels through `assert_policy`. A future agent MUST NOT treat ADR-1 as wholly void — only its per-technique gating and `--i-have-authorization` ceremony are superseded.
   - "Enabling one never implies another" (ADR-13) is gone — one authorization implies all.
   - The audit log stays a defensibility trail (what ran, when); authorization *grants* are no longer recorded per technique.
+  - **ADR-14's derived-authorization-set consequence is superseded with ADR-10.** ADR-14's migration-ledger decision (document-in-SQLite, `PRAGMA user_version`) stands; its "authorizable-technique set derived from `AcquisitionPolicy`'s boolean fields" consequence dies with the per-technique model.
   - Secrets rules remain the one non-overridable boundary.
   - Future agents MUST NOT reintroduce per-technique consent tiers or an authorization-ceremony step without a superseding ADR.
 
