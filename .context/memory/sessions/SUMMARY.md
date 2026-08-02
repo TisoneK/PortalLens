@@ -93,3 +93,7 @@ records.
 - **2026-08-02 — Session 19** — Buffy / deepseek-v4-flash — shipped the Wi-Fi picker/session slice: generation-guarded cancellable scan controller, lazy Textual picker with rescan/cancel/select controls, and `portallens wifi --platform/--interface`. 263 tests green; Ruff + strict mypy clean.
   Key decision: selection is the boundary; no credentials, association, browser launch, captive-portal automation, or bypass execution. ADR-22 records the strategy.
   Detail: .context/memory/sessions/2026-08-02-19/notes.md
+
+---
+- **2026-08-02 — Session 20** — Buffy / deepseek-v4-flash — shipped bounded captive-portal detection: allow-listed platform probes, RFC 8908 parsing, capped non-following redirects, redaction, cancellation, and passive analyzer handoff; 292 tests green. RFC 8910 decoding and live selected-session/TUI/SQLite wiring remain deferred.
+  Detail: .context/memory/reviews/2026-08-02-wifi-captive-portal-review.md

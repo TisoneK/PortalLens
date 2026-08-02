@@ -223,3 +223,11 @@ if literally nothing slowed you down.
 - **Cause:** The initial design assumed worker callback timing and treated the presentation callback as an internal implementation detail.
 - **Workaround / fix:** Added explicit listener registration, main-thread-aware callback delivery with shutdown tolerance, public initial-state seam, stale-row clearing, generation guards, and a Python-3.10-compatible forward-reference return annotation. Full validation was rerun after each correction.
 - **Prevent next time:** Test Textual worker timing separately from pure controller timing; keep UI callback registration public and lifecycle-aware from the first draft.
+
+---
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 20)
+- **Problem:** The tool harness surfaced repeated unavailable `set_output`/agent-tool errors in the inherited conversation and required several review/test iterations to converge on import ordering and calibrated probe semantics.
+- **Cost:** Moderate iteration overhead; no product data or code was lost.
+- **Cause:** Historical tool-call errors were carried into the resumed turn, and review correctly exposed edge cases (SSRF through arbitrary profiles, overclassification of HTTP errors, state idempotency, and content-type/provenance gaps) after the first implementation.
+- **Workaround / fix:** Continued with available tools, used deterministic injected HTTP seams, applied reviewer findings before the final gate, and verified the full suite after each correction.
+- **Prevent next time:** Treat resumed historical tool errors as non-authoritative noise; run a security-focused review immediately after the first detector draft and keep caller-provenance assertions explicit in the API.

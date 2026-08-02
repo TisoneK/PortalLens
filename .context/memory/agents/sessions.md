@@ -200,3 +200,18 @@ past entries — append corrections instead.
 - **Outcome:** done — generation-guarded `WifiSessionController`, lazy Textual `WifiPickerApp`, `portallens wifi --platform/--interface`, escaped network labels, safe callback cleanup, and seven focused tests. Final suite: 263 passed; Ruff and strict mypy clean across 44 source files.
 - **Open items:** Captive-portal detection for selected sessions and Wi-Fi live-event persistence remain in the backlog.
 - **Report:** `.context/memory/reviews/2026-08-02-wifi-picker-review.md`; notes: `.context/memory/sessions/2026-08-02-19/notes.md`
+
+---
+## 2026-08-02 — Session 20
+- **Agent:** Buffy | **Model:** deepseek-v4-flash | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer / feature-engineer | **Core:** 0.5.0
+- **Task:** Implement the bounded captive-portal detection slice over the Wi-Fi foundation: standards-aware platform profiles, RFC 8908 metadata, redirect/status evidence, redaction, and passive analyzer handoff without connection or bypass actions.
+- **Commits:** product + context pending — detector, evidence types, tests, README/changelog, ADR-23, review/context records
+- **Outcome:** done — fixed allow-listed Windows/Apple/Android/GNOME/Firefox profiles (including Android fallback), explicit authorization, non-following capped HTTP, typed RFC 8908 parsing with provisioned endpoint assertion, safe state application, and passive analyzer handoff. Final suite: 292 passed; Ruff and strict mypy clean across 45 source files.
+- **Open items:** RFC 8910 DHCP/RA decoding; selected-session/TUI generation-guarded orchestration; SQLite live-event persistence; verified distro-specific Linux profiles.
+- **Report:** .context/memory/reviews/2026-08-02-wifi-captive-portal-review.md
+
+---
+## 2026-08-02 — Session 20 correction
+- **Correction:** Product commit `bba1063` (`feat(wifi): add bounded captive portal detection`) is present on `main` and pushed to `origin/main`. The earlier Session 20 entry's "product + context pending" wording was stale bookkeeping, not an incomplete product result.
+- **Context status:** Review, ADR-23, backlog, session summary, inefficiency record, and idle task state are now prepared for the separate context commit.
+- **Open items:** RFC 8910 DHCP/RA decoding; selected-session/TUI generation-guarded orchestration; SQLite live-event persistence; verified distro-specific Linux profiles.

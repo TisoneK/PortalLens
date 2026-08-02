@@ -105,3 +105,13 @@ don't remove the line.
 - [x] **Wi-Fi TUI picker and live session orchestration** — DONE 2026-08-02 (Buffy / Session 19) — added generation-guarded `WifiSessionController`, lazy Textual `WifiPickerApp`, and `portallens wifi --platform/--interface` with scan/rescan/cancel/select controls. Selection is read-only; stale worker results are discarded and callbacks detach safely.
 - [ ] **Captive-portal detection for live Wi-Fi sessions** — next slice after picker; use standards-aware probe profiles and bounded redirect/status evidence without browser launch or automatic bypass execution.
 - [ ] **Wi-Fi live-event persistence** — follow-up persistence slice; append a SQLite migration for redacted scan/connection/portal/cancellation/session-switch events.
+
+---
+- [x] **Captive-portal detection for live Wi-Fi sessions** — DONE in Session 20 (`SESSION20_COMMIT`) — added allow-listed Windows/Apple/Android/GNOME/Firefox probe profiles, bounded non-following status/redirect evidence, cancellation, redaction, RFC 8908 metadata parsing, and passive analyzer handoff. This is the detector seam only; it does not yet run from a selected network session.
+- [ ] **RFC 8910 DHCP/RA captive-portal provisioning** — parse DHCPv4 option 114, DHCPv6 option 103, and IPv6 RA option 37 into a typed, provenance-carrying endpoint source; do not accept arbitrary user URLs as equivalent provenance.
+- [ ] **Selected-session captive detection orchestration** — wire the detector into the Wi-Fi session controller with generation guards, cancellation, host status/IP-configured gating, and TUI activity updates; preserve no-browser/no-credentials/no-bypass behavior.
+- [ ] **Wi-Fi live-event persistence** — append the SQLite migration and redacted event path for scan snapshots, connection states, portal detection, cancellation, target switching, and worker failures.
+- [ ] **Verified distro-specific connectivity profiles** — add Debian/Ubuntu or other Linux profiles only after endpoint and expected-success contracts are verified for the target desktop environment.
+
+---
+- **Session 20 bookkeeping correction (2026-08-02):** The bounded captive-portal detection slice marked done above shipped in product commit `bba1063` (`feat(wifi): add bounded captive portal detection`). The earlier `SESSION20_COMMIT` token was a temporary placeholder and is superseded by this correction; no product work remains pending for that item.
