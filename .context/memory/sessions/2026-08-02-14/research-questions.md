@@ -242,9 +242,14 @@ all in `tests/`, none in `src/`.
 5. **Enumeration depth:** the 17-error summary in this file
    enumerates only 4 specific lines (`test_tui.py:228` +
    `test_bypass.py:194/224/238`). The remaining 13 errors live
-   in 3 other files; a `mypy --strict src tests` snapshot should
-   be pasted into this research file (or as an appendix) before
-   any fix session begins, so the fix scope is exact.
+   in 3 other files. **Snapshot policy:** when the fix session
+   picks up R3, paste a fresh `mypy --strict src tests` output
+   at the end of this R section (or as a sibling appendix in
+   this file) so the fix scope is exact at that point. This file
+   intentionally does **not** pre-snapshot — the snapshot would
+   go stale across sessions and a researcher reading a stale
+   copy would be misled into fixing sites that no longer match
+   the live `tests/`.
 
 **What this research informs:**
 - Three precise edit locations (or however many the real count
@@ -256,6 +261,20 @@ all in `tests/`, none in `src/`.
   The two-layer idiom (pre-commit local + CI server) is the typical
   durable fix for this exact pattern; pre-PR-only gates are
   unreliable because humans skip manual gates.
+- **Counter-measure implementation family** (pick one in the fix
+  session, not in this research file): `pre-commit` framework +
+  pinned hook in `pyproject.toml` `[tool.pre-commit]` config (the
+  conventional choice for projects on this scale, but this repo
+  has no `pre-commit` config yet — adding it is an adoption
+  decision), OR a `Makefile` / `task` target invoked locally +
+  a GitHub Actions step invoking the same on CI. Both forms
+  prevent drift; the choice is an ops preference, not a
+  correctness one.
+- **Canonical tracker:** `.context/memory/flaws/log.md` keeps the
+  standing-debt entry (Session 14 — known-gap carry-over). This
+  R section is the research-side framing only; the relabel + the
+  cross-link keep the two sides separate so a future editor doesn't
+  treat one as a duplicate to delete.
 
 **Priority:** Lowest. Mechanical fix; any session can do it.
 
