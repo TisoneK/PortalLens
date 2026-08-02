@@ -72,3 +72,7 @@ records.
 --
 - **2026-08-02 — Session 14** — Buffy / deepseek-v4-flash — refined the kickoff feature list against existing ADRs (ADR-15 single-auth model, ADR-16 per-action discipline, ADR-18 probe-only "never authenticate" boundary). Plan-only — no `src/` commits. Six backlog entries appended; ADR-19 drafted as the three-category per-action exemplar for session replay (synthetic / owned-target approved; captured-real refused). Items that cross ADR-18 (default creds, MAC impersonation, captured-real replay) explicitly routed through per-action ADR-16 review before any code may land.
   Detail: .context/memory/sessions/2026-08-02-14/notes.md
+
+---
+- **2026-08-02 — Session 15** — Buffy / deepseek-v4-flash — docs: README Usage condensed to a quick-start summary + new full tutorial `docs/TUTORIAL.md` (every command with options, report format, TUI, saved investigations, `--authorized`, five bypass probes, library API, troubleshooting). Reviewer caught + fixed one factual error (`--db` listed on `analyze`) and an unverified TUI quit key. 220 tests still green; nothing behavior-changing.
+  Detail: .context/memory/reviews/2026-08-02-review-2.md

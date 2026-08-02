@@ -12,7 +12,7 @@ accordingly).
 | Super Z | unknown (GLM family) | 2026-07-23 | 2026-07-23 | 2 |
 | Claude Code | claude-opus-4-8 | 2026-07-23 | 2026-07-23 | 2 |
 | GitHub Copilot | DeepSeek V4 Flash Free | 2026-07-23 | 2026-07-23 | 1 |
-| Buffy | deepseek-v4-flash | 2026-08-01 | 2026-08-02 | 2 |
+| Buffy | deepseek-v4-flash | 2026-08-01 | 2026-08-02 | 3 |
 
 ## Observations
 
@@ -29,3 +29,4 @@ Update in place when a newer session contradicts an old observation.
 - **Claude Code / claude-opus-4-8 — session 5:** Implemented ADR-8 (persisted `Investigation`, SQLite) as directed, though it landed ahead of the ADR-9 ordering it had itself recommended — confirmed the two are independent before proceeding rather than reflexively following its own prior sequencing. Took "test real application" literally: exercised the built CLI across 4 separate processes against one DB file, not just in-process asserts. Document-in-SQLite + a real `PRAGMA user_version` migration ledger; derived the authorizable-technique set from `AcquisitionPolicy` so ADR-13's future flags need no edit. Tests 102 → 135, ruff+mypy clean (2026-07-23)
 - **Buffy / deepseek-v4-flash — session 9:** setup-only session (core 0.3.0 → 0.5.0 sync + portallens initialization) — followed the full Phase 1 (pull, verify, read `.context/`, load local edition, baseline health) before any change; ran the code-reviewer on the `.context/` diff; completed the 0.5.0 exit including the new `memory/sessions/` module. Verified baseline green (ruff, mypy 24 files, 146 tests) and E2E CLI output on the real fixture pair (2026-08-01)
 - **Buffy / deepseek-v4-flash — session 13:** implemented five bounded bypass probes and report-level detection; reviewer feedback caught and fixed parameter-tampering false negatives, stale test assumptions, and overclaiming from open ports. Final Ruff/mypy/pytest gates were clean (220 tests) (2026-08-02)
+- **Buffy / deepseek-v4-flash — session 15:** docs session (README quick start + full tutorial). Verified every documented command/probe/step against `cli.py`/`bypass.py`/`steps` source before writing, yet the code-reviewer still caught a factual error (`--db` listed under `analyze`, which doesn't accept it) and an unverified TUI quit key. Lesson: when documenting a CLI, cross-check each flag against the actual `@click.option` decorators, and don't state UI behaviors (key bindings) not present in source (2026-08-02)

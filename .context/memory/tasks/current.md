@@ -4,6 +4,6 @@ Holds exactly one task — the one being worked on right now. Set it at
 session start (protocol Step 3), clear it at session end (Step 15). If a
 prior session died mid-task, check its session entry and backlog first.
 
-- **Session:** —
-- **Task:** none — completed Session 14 (2026-08-02): refined the kickoff feature list (sections 1-5: bypass verification, gateway probing, parameter fuzzing, network mapping, intelligence gathering) against the existing ADRs. Plan-only — no `src/` commits. Six entries appended to `tasks/backlog.md` (CT-log framing stays as-is under the existing entry + the Session-12 footer; three new entries for passive/active additions; three per-action ADR-16 review items because the corresponding capabilities cross ADR-18's "never authenticate, submit credentials, send exploit payloads, or attempt to obtain access" boundary). One ADR drafted — ADR-19 session-replay classification — with two further per-action ADRs (default-credential auth, L2 MAC impersonation) flagged as **required before any code**, not drafted this session. Active-attack features will run behind the single `--authorized` flag (ADR-15) per the user's standing decision.
+- **Session:** 15 (2026-08-02)
+- **Task:** completed — docs target from chat: "Add how to use the tool in README (summary) but point to full tutorial to a dedicated file". README Usage section condensed to a quick-start summary pointing at the new full tutorial `docs/TUTORIAL.md` (install, all CLI verbs + options, report walkthrough, TUI, saved investigations + steps, `--authorized`, bypass probes, library API, SARIF, troubleshooting). Commits e532198 + 37b5322 pushed to main; CHANGELOG entry added.
 - **Status:** idle

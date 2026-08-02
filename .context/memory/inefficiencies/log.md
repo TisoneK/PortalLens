@@ -184,3 +184,11 @@ if literally nothing slowed you down.
 - **Decision:** subsequent sessions logging standing-debt items should put them in `flaws/log.md` directly. Honest-friction entries in this file should reference *what slowed work this session*, not deferred follow-ups.
 - **Cost:** one extra commit, one file duplication. No functional impact.
 - **Cause:** the Session-14 (3) wording ("carried-over debt, not new friction") did not match the file header ("Friction you absorb silently"). The standing append-only convention precludes fix-in-place, so re-file + correction-note is the right shape.
+
+--
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 15)
+- **Problem:** The first `portallens --help` smoke check failed with "command not found" — the CLI is installed in the project `.venv` but the shell had no activated venv. Also re-hit the known `read_files` 20k-token truncation (Session-14 (2)) when batching several large `.context/memory/` files in one call.
+- **Cost:** ~2 min — one extra basher call to find `.venv/bin/portallens`; one re-read batch for the memory files.
+- **Cause:** `portallens` is not on PATH without `source .venv/bin/activate`; the harness read-truncation cap on bundled large files is the known Session-14 (2) trap.
+- **Workaround / fix:** Used `.venv/bin/portallens` directly; kept `.context/` reads to smaller targeted batches.
+- **Prevent next time:** `system/environments.md` already records `.venv/bin/...` as the verified invocation forms for this machine — check that block before running any project CLI rather than guessing bare names (this session did exactly that in hindsight; the block was read later).
