@@ -323,6 +323,12 @@ def _normalize_bssid(value: str) -> str:
     return value.strip().lower()
 
 
+def safe_portal_url(value: str | None) -> str | None:
+    """Redact sensitive URL components before persistence or evidence."""
+
+    return _safe_portal_url(value)
+
+
 def _safe_portal_url(value: str | None) -> str | None:
     """Redact sensitive URL components before persistence."""
 
@@ -370,4 +376,5 @@ __all__ = [
     "WifiConnectionState",
     "WifiNetwork",
     "WifiSecurity",
+    "safe_portal_url",
 ]

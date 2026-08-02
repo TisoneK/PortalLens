@@ -64,6 +64,31 @@ portallens show <id>
 portallens step <id> resolve_dns
 ```
 
+### Bounded captive-portal detection
+
+The Wi-Fi library also exposes authorized, non-following connectivity probes
+for Windows, Apple, Android, GNOME, and Firefox-style checks, plus RFC 8908
+Captive Portal API (RFC 8908) parsing. RFC 8910 DHCP/RA option decoding is
+not included yet; callers provide the already-provisioned endpoint and assert
+its source with `provisioned=True`. They capture redirect/status evidence and can hand
+a validated portal URL to the existing passive analyzer without opening a
+browser or submitting credentials. The current slice is a library seam; it is
+not yet wired into the picker/TUI or SQLite live-event stream.
+
+```python
+from portallens.portal import AcquisitionPolicy
+from portallens.wifi import ANDROID_GENERATE_204, CaptivePortalDetector
+
+result = CaptivePortalDetector().probe(
+    ANDROID_GENERATE_204,
+    AcquisitionPolicy(authorized=True),
+)
+```
+
+Only fixed legacy profiles are accepted. RFC 8908 endpoints must be HTTPS and
+explicitly provisioned by the host OS (`provisioned=True`); redirects are
+captured but never followed.
+
 ### Command surface
 
 | Command | What it does |

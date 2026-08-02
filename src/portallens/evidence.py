@@ -44,6 +44,9 @@ class EvidenceType(str, Enum):
     BYPASS_CLICK_THROUGH = "bypass_click_through"  # a request reached the intended site or portal
     BYPASS_PORT = "bypass_port"             # a bounded port check was open or closed
     BYPASS_PARAMETER = "bypass_parameter"   # a navigation-parameter mutation was allowed or blocked
+    CAPTIVE_PORTAL_STATUS = "captive_portal_status"  # connectivity probe status/classification
+    CAPTIVE_PORTAL_REDIRECT = "captive_portal_redirect"  # captured, non-followed Location target
+    CAPTIVE_PORTAL_METADATA = "captive_portal_metadata"  # validated RFC 8908 metadata field
     USER_SUPPLIED = "user_supplied"         # the user pasted this in directly
 
 
