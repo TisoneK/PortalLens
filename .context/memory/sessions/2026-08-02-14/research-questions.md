@@ -1,5 +1,11 @@
 # Session 15+ Research Questions
 
+> **Adjacent file in this directory:**
+> - [notes.md](notes.md) — Session-14 plan-only narrative summary
+>   (the what / why / how of refining the kickoff feature list). Read
+>   that first for session context; read this file for the long-form
+>   research framing of the three followup items.
+
 **Logged from:** Session 14 (Buffy / 2026-08-02 / plan-only) — three followups
 flagged at session close. These are **research markers**: questions to
 investigate or design work to do before any producer code lands. They
@@ -46,6 +52,17 @@ sharp shape TBD per research below.
      (`HTTP basic` / `HTTP form` / `SSH password` / `SSH key` /
      `SNMP community string` / `RADIUS shared secret`), each with
      its own per-mechanism risk assessment and acceptance criteria.
+   - **Third axis (likely needed): credential-source provenance**
+     — separates `vendor-doc defaults` (well-known list in the
+     vendor's published docs; e.g. MikroTik default), `observed on
+     another instance` (capture-neutral: derived from a separate
+     authorized scan), and `last-resort guess / proprietary
+     convention` (e.g. `admin:admin` because an installer guessed).
+     The risk profile differs enough that mechanism-bucketed
+     alone understates it. A vendor-doc default is the lowest-risk
+     shape (every operator knows it; not "leaked"); an observed-
+     on-other-instances provenance is intermediate; a guess is the
+     highest-risk shape (no provenance at all).
    - Alternative shape: **binary lab-vs-live**
      (`--lab-only` mode enforcing testbed-only targets + a
      hardcoded credential allowlist).
@@ -57,6 +74,17 @@ sharp shape TBD per research below.
      allowlist + state rollback guarantee + `dry-run` default
      ensures the operator cannot accidentally MAC-spoof a live
      client.
+   - **Graded continuum (worth considering)** — three monotonically
+     increasing real-world impact states of the same capability:
+     `dry-run-only` (compute & log what the spoof would do without
+     changing anything) / `lab-with-state-rollback` (spoil the L2
+     address but with a hard rollback guarantee + ARP-table restore)
+     / `live-with-explicit-allowlist-and-attestation` (allowlist of
+     bSSIDs the operator is *explicit authorized* to impersonate,
+     with per-spoof audit). The implied `accepted-or-refused`
+     gate may be too coarse if the dry-run shape is fundamentally
+     less invasive than the live-with-attestation shape; ADR-19
+     would need three categories and per-category decisions.
    - Cross-cutting: MAC-station correlation can become org profiling
      (ADR-12 bounded-BI bound). The dry-run default is also the
      org-profiling guard here.
@@ -123,6 +151,33 @@ written yet.
    (low) is the standing guarantee against "org profiling feels
    accurate." If `co_host_enumerate` feeds a `SAME_OPERATOR`
    inference, the same ADR-3 cap should apply.
+5. **IPv6 / dual-stack:** captive-portal gateways are increasingly
+   dual-stack. Should the step issue AAAA + PTR for IPv6 alongside
+   A + PTR for IPv4, or is IPv6 explicitly out-of-scope for v1?
+   A two-stack operator-co-IP list (v4 + v6 separately or merged)
+   is non-trivial.
+6. **PTR self-reference dedup:** the target IP may list its own
+   hostname in PTR (a gateway may publish its own name on its own
+   IP). Evidence carrying `(target_ip, target_ip_hostname)` is
+   noise, not signal. Dedup rule needed.
+7. **Wildcard PTR handling:** some records use `*.customer.example.com`
+   as a catch-all. Two interpretations possible: (a) treat as one
+   evidence record with a `wildcard: true` flag, (b) treat as the
+   concrete name `customer.example.com`. Pick one and document.
+8. **Resolver choice + upstream etiquette:** which resolver does
+   the step send queries through — system (`/etc/resolv.conf`),
+   a public one (8.8.8.8 / 1.1.1.1), or the authoritative
+   server for the IP's reverse zone? Per-query rate-limit relevant
+   beyond ADR-12 as "don't amplify DNS traffic into the public
+   resolver infrastructure." Decide + document.
+9. **Evidence-type granularity:** `CO_HOST_PAIR` is fine as a
+   relationship-shape record, but it discards TTL — which is the
+   input to research-question #1 (freshness). A layered schema is
+   cleaner: emit raw `PTR_RECORD` records (`(target_ip, ptr_name,
+   ttl, observed_at, source_resolver)`) at the evidence layer,
+   derive `CO_HOST_PAIR` for relationship inference. Both research
+   questions (#1 freshness + #3 noisy-OR combine with CT-log) get
+   a richer input.
 
 **What this research informs:**
 - The exact `AnalysisStep` shape (slug `co_host_enumerate`,
@@ -184,14 +239,23 @@ all in `tests/`, none in `src/`.
    custom rules + a tighter `pyright` baseline serve the same
    purpose without the cost? (Out of scope this session — flag
    for future workflow discussion.)
+5. **Enumeration depth:** the 17-error summary in this file
+   enumerates only 4 specific lines (`test_tui.py:228` +
+   `test_bypass.py:194/224/238`). The remaining 13 errors live
+   in 3 other files; a `mypy --strict src tests` snapshot should
+   be pasted into this research file (or as an appendix) before
+   any fix session begins, so the fix scope is exact.
 
 **What this research informs:**
 - Three precise edit locations (or however many the real count
   is) in `tests/`.
 - Whether `workflows/active.md` should re-assert mypy strict as
   the gate, or relax toward ruff-only for daily sessions.
-- Whether a pre-merge `mypy --strict` hook would have caught this
-  drift before the second session hard-coded it.
+- Whether a pre-commit `mypy --strict` hook + a CI check would
+  have caught this drift before the second session hard-coded it.
+  The two-layer idiom (pre-commit local + CI server) is the typical
+  durable fix for this exact pattern; pre-PR-only gates are
+  unreliable because humans skip manual gates.
 
 **Priority:** Lowest. Mechanical fix; any session can do it.
 

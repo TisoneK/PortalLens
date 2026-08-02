@@ -177,3 +177,10 @@ if literally nothing slowed you down.
 - **Cause:** Session 13 landed `bypass_detection.py` and new probe tests without a `mypy --strict src tests` pass on the new code. The drift came in with that product commit, not as a later regression.
 - **Workaround / fix:** Logged as research item **R3** in `.context/memory/sessions/2026-08-02-14/research-questions.md` — research-priority lowest, mechanical fix in any session. Concrete locations: `tests/test_tui.py:228` (missing type annotation), `tests/test_bypass.py:194/224/238` (`portal_type: str` passed where `PortalType` enum expected; the remaining 13 errors are spread across 3 other files and need a fresh `mypy --strict src tests` to enumerate precisely).
 - **Prevent next time:** Add a `mypy --strict src tests` pre-commit (or pre-PR) check so the standing expectation in `workflows/active.md` cannot drift from session to session. If strict is too noisy for daily work, decide explicitly to relax it — do not let it lag silently.
+
+--
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 14 (4) — relocation)
+- **Note:** The previous Session-14 (3) entry (the mypy-strict baseline deferral note) was filed here in error. `inefficiencies/log.md` is for friction *experienced this session*; the mypy entry is "carried-over debt from Session 13" — that fits `flaws/log.md`'s standing-debt convention better. The canonical mypy-deferral tracking has been re-filed in `.context/memory/flaws/log.md` (the latest entry there). This Session-14 (4) entry is the append-only correction so the trail isn't split.
+- **Decision:** subsequent sessions logging standing-debt items should put them in `flaws/log.md` directly. Honest-friction entries in this file should reference *what slowed work this session*, not deferred follow-ups.
+- **Cost:** one extra commit, one file duplication. No functional impact.
+- **Cause:** the Session-14 (3) wording ("carried-over debt, not new friction") did not match the file header ("Friction you absorb silently"). The standing append-only convention precludes fix-in-place, so re-file + correction-note is the right shape.

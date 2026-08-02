@@ -75,3 +75,16 @@ Friction caused by the `.context/` system or the protocol itself. See
 - **Root cause:** The protocol treats "commit succeeded" as implicit proof the identity is fine, and checks only `git config user.name`. It never has the agent verify the *effective author* against the recorded project identity.
 - **Suggested fix:** In Step 1 of BOTH editions, replace the `git config user.name`-only check with an effective-author verification: "Run `git var GIT_AUTHOR_IDENT` and compare it against `user/identity.md`'s recorded git identity. An unconfigured identity does NOT error — git auto-derives `Name <user@hostname>` from the OS account and commits succeed mislabeled, so `git config user.name` being non-empty (or a commit succeeding) is not proof the author is correct. If the effective author doesn't match the recorded identity, set `git config --local user.name/email` to it before the first commit." Add a matching pitfall: "Don't trust that commits are correctly attributed just because they succeed — `git commit` fabricates an OS-derived author when none is configured; verify with `git var GIT_AUTHOR_IDENT`."
 - **Status:** open
+
+--
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 14 — known-gap carry-over)
+
+- **Flaw:** Standing-debt carry-over from Session 13: 17 pre-existing `mypy --strict` errors in `tests/test_tui.py` + `tests/test_bypass.py` + 3 other test files. Session 13's review report surfaced them. Session 14 (plan-only) explicitly deferred rather than addressing them (touches `tests/` was outside plan-only scope).
+- **Symptom:** `mypy --strict src tests` reports 17 errors in 5 `tests/` files. `ruff check src tests` clean. `pytest` 220 passing. The standing `workflows/active.md` expectation "ruff + mypy strict clean" is currently half-satisfied — ruff green, strict mypy red.
+- **Concrete locations:**
+  - `tests/test_tui.py:228` — function missing type annotation (`[no-untyped-def]`).
+  - `tests/test_bypass.py:194/224/238` — `portal_type: str` passed to `PortalReport` where `PortalType` enum is expected (`[arg-type]`). Likely a leftover convention from before the Session-5 `AnalysisStep`-registry refactor.
+  - 13 additional errors in 3 other `tests/` files (need a fresh `mypy --strict src tests` snapshot to enumerate precisely; logged as research item R3 in `.context/memory/sessions/2026-08-02-14/research-questions.md`).
+- **Root cause:** Session 13's `feat(security): add captive portal bypass detection` landed `bypass_detection.py` + new probe tests without a `mypy --strict` pass on the new test code. Drift came in with the product commit; no later regression.
+- **Suggested fix:** (a) Run `mypy --strict src tests` and paste the full output to research R3 so the fix scope is exact. (b) Add a pre-commit `mypy --strict src tests` hook + a CI check (the typical two-layer idiom; pre-PR-only is unreliable). (c) Edit each of the 17 sites — likely one-line type narrowing for the `portal_type` calls, and a parameter / return annotation for the test_tui.py fixture. Update `workflows/active.md` if strict is too noisy for daily work — do not let it lag silently.
+- **Status:** open (planned Session-15 candidate per research R3).

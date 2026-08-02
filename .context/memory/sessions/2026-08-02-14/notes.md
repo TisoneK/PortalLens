@@ -1,5 +1,13 @@
 # Session 14 — Plan-only refinement (2026-08-02)
 
+> **Adjacent file in this directory:**
+> - [research-questions.md](research-questions.md) — three Session-14
+>   followups framed as research items (R1 ADR-shape decisions for
+>   default-cred + MAC; R2 `co_host_enumerate` AnalysisStep design;
+>   R3 pre-existing mypy-strict baseline). Read after this notes file
+>   for the long-form research framing; read this notes file first
+>   for the session narrative.
+
 ## User target
 
 Refine the kickoff feature list (sections 1-5: active bypass verification,
