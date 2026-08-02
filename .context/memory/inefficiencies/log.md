@@ -169,3 +169,11 @@ if literally nothing slowed you down.
 - **Cause:** I bundled too many large files into single `read_files` calls; the per-call token cap truncates rather than errors.
 - **Workaround / fix:** When context density is the goal, prefer smaller targeted calls or have the thinker handle the heavy reads. Worked around here because I had prior partial reads.
 - **Prevent next time:** For `.context/memory/` reads, prefer two or three smaller `read_files` calls over one big one, or pass a single large file plus context to the thinker and let it budget internally.
+
+--
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 14 (3))
+- **Problem:** Session 13's review report flagged 17 pre-existing `mypy --strict` errors in `tests/test_tui.py` + `tests/test_bypass.py` (and 3 other files). Session 14 (plan-only) explicitly deferred this rather than addressing it: touching `tests/` was outside the plan-only scope.
+- **Cost:** Zero this session — `pytest` still passes 220 with the test-mode relaxations standing; the `workflows/active.md` "ruff + mypy strict clean" expectation is already red from Session 13. Carried-over debt, not new friction.
+- **Cause:** Session 13 landed `bypass_detection.py` and new probe tests without a `mypy --strict src tests` pass on the new code. The drift came in with that product commit, not as a later regression.
+- **Workaround / fix:** Logged as research item **R3** in `.context/memory/sessions/2026-08-02-14/research-questions.md` — research-priority lowest, mechanical fix in any session. Concrete locations: `tests/test_tui.py:228` (missing type annotation), `tests/test_bypass.py:194/224/238` (`portal_type: str` passed where `PortalType` enum expected; the remaining 13 errors are spread across 3 other files and need a fresh `mypy --strict src tests` to enumerate precisely).
+- **Prevent next time:** Add a `mypy --strict src tests` pre-commit (or pre-PR) check so the standing expectation in `workflows/active.md` cannot drift from session to session. If strict is too noisy for daily work, decide explicitly to relax it — do not let it lag silently.
