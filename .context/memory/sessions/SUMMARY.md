@@ -55,3 +55,7 @@ records.
 - **2026-08-01 — Session 9** — Buffy / deepseek-v4-flash — synced `.context/` (core 0.3.0 → 0.5.0) + initialized portallens on macOS (editable install, ruff/mypy/146 tests green, E2E CLI smoke on the fixture pair). First session on core 0.5.0 — created the `memory/sessions/` module.
   Key discovery: 0.5.0 adds session-scoped memory + `context-sync.ps1` (Windows port, as-yet unexercised outside the package repo).
   Detail: .context/memory/sessions/2026-08-01-9/notes.md
+
+---
+- **2026-08-02 — Session 11** — Buffy / deepseek-v4-flash — records-only security-constraint relaxation: ADR-15 (one authorization unlocks all active techniques, supersedes ADR-1/10/13), ADR-16 (assess/exploit ban lifted — nothing built, supersedes ADR-12), ADR-17 (disclosure schema optional). Code alignment backlogged.
+  Detail: .context/memory/sessions/2026-08-02-11/notes.md

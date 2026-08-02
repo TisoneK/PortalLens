@@ -6,5 +6,5 @@ you find a stale in-progress entry here, a prior session died mid-task —
 check its session entry and backlog before starting.
 
 - **Session:** —
-- **Task:** none — no session in progress. Last completed: Session 10 (2026-08-01) — security system build (ADR-9/10/11/12/13: AnalysisStep registry + DNS/IP-ASN steps, SecurityCheck registry + three checks, NetAudit, SARIF, CLI step verb); see `../reviews/2026-08-01-review-2.md`. Recommended next: CT-log mining (Tier-1 OSINT) or DisclosureDesk.
+- **Task:** none — no session in progress. Last completed: Session 11 (2026-08-02) — records-only security-constraint relaxation (ADR-15/16/17 supersede ADR-1/10/12/13 + disclosure-schema mandate; preferences + workflow updated; no code changed). Recommended next: align `src/` with ADR-15/16/17 (single `AcquisitionPolicy.authorized` flag, drop auth ceremony, optional finding schema) — see backlog.
 - **Status:** idle

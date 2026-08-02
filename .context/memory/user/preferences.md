@@ -41,7 +41,7 @@ correction twice.
 ## Code style
 
 - Plugin-based architecture: name the core abstraction broadly (`Portal`) so future portal types (web auth, payment, ISP) slot in without an architectural rewrite. The first concrete plugin is `captive_wifi` (stated, 2026-07-23)
-- Separate the product surface from the security-audit surface — passive analysis (no probing) is the default; active assessment requires explicit authorization (stated, 2026-07-23)
+- Separate the product surface from the security-audit surface — passive analysis (no probing) remains the default; a single authorization unlocks all active techniques (changed, 2026-08-02 — ADR-15)
 - Vendor/provider knowledge is data, not code. The analyzer must not be centered on whichever provider it was first written against — platform recognition lives in a registry that any provider slots into (correction, 2026-07-23 — the session-2 target was exactly this observation about the MVP)
 
 ## Review depth
@@ -50,5 +50,6 @@ correction twice.
 
 ## Risk & approvals
 
-- Never actively scan or probe networks without authorization — passive analysis only by default (stated, 2026-07-23)
-- Vulnerability disclosure must be evidence-backed: a finding states Title, Affected asset, Evidence, Impact, Confidence, Recommended remediation, and Verification status — never bare "your system is insecure" claims (stated, 2026-07-23)
+- Active techniques unlock behind a single authorization; passive remains the default. The assess/exploit boundary is lifted (ADR-16) — the operator is responsible for targets they authorize (changed, 2026-08-02)
+- Findings no longer must carry the full disclosure schema; evidence-backed findings remain good practice, not a requirement (changed, 2026-08-02 — ADR-17)
+- Keep the `.context/` security constraints flexible — relax any that feel restrictive rather than accumulating ceremony (stated, 2026-08-02)

@@ -170,3 +170,37 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - Future agents MUST add schema changes as new entries in `_MIGRATIONS`, never by editing a shipped migration or hand-mutating a live DB.
   - Promoting a column (e.g. `disclosure_state` for DisclosureDesk) is the sanctioned way to make a JSON field queryable — the ledger exists for exactly this.
   - No new runtime dependency: `sqlite3` is stdlib. Persistence must stay dependency-free — do not swap in an ORM without a superseding ADR.
+
+---
+## ADR-15: Single acquisition authorization — consent tiers collapsed (2026-08-02)
+- **Status:** accepted — supersedes ADR-1 (per-technique gating + `--i-have-authorization`), ADR-10 (per-investigation per-technique authorization records), ADR-13 (consent tiers)
+- **Context:** The user directed (2026-08-02): "Remove any .context constraints that feel restrictive. The project should stay flexible." The per-technique consent model — a separate `AcquisitionPolicy` flag per technique (`fetch_urls`, `follow_redirects`, `resolve_dns`, `probe_tls`, `port_scan`, `use_osint_apis`) plus a `--i-have-authorization` CLI gate and per-investigation per-technique authorization records — felt like ceremony that fragments one authorization into many.
+- **Decision:** A **single authorization unlocks all active techniques**. One boolean on `AcquisitionPolicy` (e.g. `authorized`, CLI `--authorized`) replaces the per-technique flags; when set, every active technique is permitted; when unset, analysis is fully passive. The `--i-have-authorization` CLI gate and the per-investigation per-technique authorization records are removed. **Passive remains the default** — the single flag defaults off.
+- **Consequences:**
+  - **Records-level decision made 2026-08-02; code alignment is a separate backlog item.** `src/` still enforces the per-technique model today (flags, `assert_policy(..., technique)`, `investigation.authorize/is_authorized`, the `authorize` CLI verb). A future session aligns the code with this ADR (see backlog).
+  - **The ADR-1 architectural invariant stands.** This ADR changes the *consent model*, not the acquisition boundary: `acquisition/fetcher.py` remains the ONLY place PortalLens reaches outside the process, and every active technique still funnels through `assert_policy`. A future agent MUST NOT treat ADR-1 as wholly void — only its per-technique gating and `--i-have-authorization` ceremony are superseded.
+  - "Enabling one never implies another" (ADR-13) is gone — one authorization implies all.
+  - The audit log stays a defensibility trail (what ran, when); authorization *grants* are no longer recorded per technique.
+  - Secrets rules remain the one non-overridable boundary.
+  - Future agents MUST NOT reintroduce per-technique consent tiers or an authorization-ceremony step without a superseding ADR.
+
+---
+## ADR-16: Assess-and-exploit boundary lifted — ban removed, nothing built yet (2026-08-02)
+- **Status:** accepted — supersedes the assess-not-exploit bound of ADR-12; the bounded-business-intelligence bound of ADR-12 **remains standing** (user confirmed 2026-08-02: "only the exploit bound")
+- **Context:** The user directed (2026-08-02): remove the security constraints that feel restrictive; the project should stay flexible. Asked directly whether the tool should be able to "test exploit" when consented, the user confirmed: lift the ban, but **build nothing yet** — this session removes the prohibition only. Asked separately whether the ADR-12 bounded-business-intelligence bound should also be lifted, the user said **no** — only the exploit bound.
+- **Decision:** The standing "assess, never exploit" boundary is **lifted**. Nothing in the project's rules any longer forbids going beyond detection (performing a bypass, firing a payload, authenticating to a reachable admin panel) — provided the single authorization (ADR-15) is set and the operator is responsible for the target. **No exploit capability is added in this session** — the tool's behavior is unchanged until future work deliberately adds exploit actions.
+- **Consequences:**
+  - The README promise "it does not bypass authentication" becomes a description of *current* behavior, not a binding constraint; update it if/when exploit actions land.
+  - Future agents may design exploit actions without a superseding ADR, but each exploit action must still run only under the single authorization (ADR-15), carry its own risk assessment, and be recorded (own ADR or backlog item) before implementation.
+  - This ADR is the "explicit user direction" ADR-12 required before crossing the boundary.
+  - **The bounded-business-intelligence bound of ADR-12 stays in force:** purpose-built organization-profiling collectors remain prohibited, and `RESELLS_BANDWIDTH` stays capped at low (ADR-3) — unless a future superseding ADR lifts it.
+
+---
+## ADR-17: Disclosure schema relaxed — findings may be lightweight (2026-08-02)
+- **Status:** accepted — supersedes the ADR-11 consequence that every finding carries the full disclosure schema (and the matching `user/preferences.md` bullet)
+- **Context:** The user directed (2026-08-02): "Drop evidence schema" — the mandatory disclosure structure (Title, Affected asset, Evidence, Impact, Confidence, Recommended remediation, Verification status) felt restrictive.
+- **Decision:** The disclosure schema becomes **optional in intent**. A finding may be a bare `check_slug` + `title` + `severity` + `confidence`; the full schema is one valid shape, not the required one. Evidence citation and confidence scores remain good practice — they are the product's differentiator — but they are no longer mandated per finding.
+- **Consequences:**
+  - **Code alignment is a separate backlog item:** `SecurityFinding`'s required fields (`impact`, `remediation`, `verification_status`) become optional; `run_checks` and the Markdown/SARIF renderers tolerate missing fields.
+  - The `user/preferences.md` "disclosure must be evidence-backed" bullet is updated in place to match (current-state file, provenance refreshed).
+  - Future agents MUST NOT re-mandate the full schema without a superseding ADR.

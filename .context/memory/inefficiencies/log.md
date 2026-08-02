@@ -128,3 +128,11 @@ if literally nothing slowed you down.
 - **Workaround / fix:** Recorded this session as 9 and flagged the ambiguity; next agents should cite commit SHAs when referencing "session 8". The 0.5.0 `memory/sessions/` module's SUMMARY.md gives a cleaner continuity view for future numbering.
 - **Prevent next time:** When starting a session, count actual entries in `agents/sessions.md` (not the last visible number) before numbering, and cross-check against the most recent date. Worth a flaw entry if it recurs.
 - **Also noted:** `context-sync.ps1` (core 0.4.0/0.5.0) has never been exercised by a real Windows agent — the next Windows session should run it and log the result; the sh-based `verify` is known to break on Windows Git Bash CRLF (logged flaw, session 6).
+
+---
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 11)
+- **Problem:** The kickoff target "Remove any .context constraints that feel restrictive. The project should stay flexible." was ambiguous between *workflow ceremony* (push policy, report requirements, Phase-1 steps) and *security constraints* (ADR-1/10/12/13, acquisition policy, disclosure schema). My first ask_user round presented workflow-ceremony options; the user interrupted with "I meant security constraints". Additionally, the first ask_user's second question (change scope) returned with no answer selected, so it had to be re-asked in a second round.
+- **Cost:** ~2 ask_user rounds before any edit; zero time wasted on edits since the user stopped me before I touched anything.
+- **Cause:** The word "constraints" legitimately spans both surfaces; I guessed the workflow reading first. And the multi-question ask_user response came back with only Q1 answered — the scope question silently lacked an answer.
+- **Workaround / fix:** Re-scoped to security constraints, then re-asked the scope question alone; the user's answers collapsed the task to "lift the ban, build nothing, records-only".
+- **Prevent next time:** For an ambiguous target spanning workflow vs. project policy, present a *category* question first ("which kind of constraints?") before detailed options. After a multi-question ask_user, verify every question got an answer before proceeding.

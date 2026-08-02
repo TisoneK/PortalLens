@@ -17,7 +17,7 @@ user changes the rules; note the change in your session entry.
 - **Default role:** engineer — full-scope per the edition; role overlays in `.context/core/roles/` (reviewer, security-auditor, docs-agent, feature-engineer) when a session needs a narrower scope
 - **Scope:** discovery + review + feature implementation (MVP scaffold is the standing target until the project has a runnable baseline)
 - **Target:** feature — bootstrap PortalLens MVP: plugin-based Portal core abstraction + captive_wifi analyzer (passive: fingerprinting, platform identification, network-architecture inference, relationship mapping) + evidence-backed reporting with confidence scores
-- **Focus areas:** architecture, security (passive by default), testing, docs — security-audit/active-scan work is gated behind explicit authorization and lives in a separate audit module, not the passive analyzer
+- **Focus areas:** architecture, security, testing, docs — security work lives in a separate audit module; active techniques unlock behind a single authorization (ADR-15); the assess/exploit boundary is lifted (ADR-16) with no exploit capability built yet; findings may be lightweight (ADR-17). Code alignment with ADR-15/16/17 is a pending backlog item — `src/` still enforces the per-technique model
 - **Findings handling:** fix safe issues; flag architectural changes for explicit approval
 - **Push policy:** push to main directly after each commit
 - **Commit style:** Conventional Commits with scope (`feat(core):`, `feat(captive_wifi):`, `fix(reporting):`, `docs:`, `chore(context):` for `.context/` updates, `docs(review):` for review reports)
