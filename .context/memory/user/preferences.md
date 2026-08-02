@@ -42,6 +42,7 @@ correction twice.
 
 - Plugin-based architecture: name the core abstraction broadly (`Portal`) so future portal types (web auth, payment, ISP) slot in without an architectural rewrite. The first concrete plugin is `captive_wifi` (stated, 2026-07-23)
 - Separate the product surface from the security-audit surface — passive analysis (no probing) remains the default; a single authorization unlocks all active techniques (changed, 2026-08-02 — ADR-15)
+- Report output stays technical-by-design — user declined adding plain-language output modes (summary paragraph, plain report mode, glossary; offered via ask_user after a live run, chose "leave it as is"). Do not propose re-litigating report accessibility unprompted (stated, 2026-08-02)
 - Vendor/provider knowledge is data, not code. The analyzer must not be centered on whichever provider it was first written against — platform recognition lives in a registry that any provider slots into (correction, 2026-07-23 — the session-2 target was exactly this observation about the MVP)
 
 ## Review depth
