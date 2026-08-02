@@ -54,3 +54,5 @@ correction twice.
 - Active techniques unlock behind a single authorization; passive remains the default. The assess/exploit boundary is lifted (ADR-16) — the operator is responsible for targets they authorize (changed, 2026-08-02)
 - Findings no longer must carry the full disclosure schema; evidence-backed findings remain good practice, not a requirement (changed, 2026-08-02 — ADR-17)
 - Keep the `.context/` security constraints flexible — relax any that feel restrictive rather than accumulating ceremony (stated, 2026-08-02)
+- For the live Wi-Fi feature, prefer desktop-first delivery (Windows/macOS/Linux) before mobile support (stated, 2026-08-02)
+- For Wi-Fi connection, use OS-mediated networking only; PortalLens must not receive or store credentials (stated, 2026-08-02)

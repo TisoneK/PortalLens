@@ -12,7 +12,7 @@ accordingly).
 | Super Z | unknown (GLM family) | 2026-07-23 | 2026-07-23 | 2 |
 | Claude Code | claude-opus-4-8 | 2026-07-23 | 2026-07-23 | 2 |
 | GitHub Copilot | DeepSeek V4 Flash Free | 2026-07-23 | 2026-07-23 | 1 |
-| Buffy | deepseek-v4-flash | 2026-08-01 | 2026-08-02 | 3 |
+| Buffy | deepseek-v4-flash | 2026-08-01 | 2026-08-02 | 4 |
 
 ## Observations
 
@@ -32,3 +32,4 @@ Update in place when a newer session contradicts an old observation.
 - **Buffy / deepseek-v4-flash — session 15:** docs session (README quick start + full tutorial). Verified every documented command/probe/step against `cli.py`/`bypass.py`/`steps` source before writing, yet the code-reviewer still caught a factual error (`--db` listed under `analyze`, which doesn't accept it) and an unverified TUI quit key. Lesson: when documenting a CLI, cross-check each flag against the actual `@click.option` decorators, and don't state UI behaviors (key bindings) not present in source (2026-08-02)
 
 - **Buffy / deepseek-v4-flash — session 16:** built the live investigation console TUI — StatusBar (AUTH badge + live counters), streaming RichLog activity feed, keyboard controls (1-9 next-steps, probe, monitor, auto, save, export, refresh), single-flight `@work(thread=True)` workers + evidence dedupe, monitor + auto-run modes, `--auto`/`--monitor`/`--monitor-interval` flags, auto-save at launch. Held ADR-7 (pure control layer, engine untouched) and ADR-15 (`--authorized` gating) invariants; 31 TUI tests incl. 9 new. Two first-pass Textual API surprises (RichLog not Log for markup; no `App.unbind`) caught by tests; post-push reviewer caught three concurrency bugs (worker exception wedges busy, monitor duplicates evidence, dual exclusive workers race the busy flag) — fixed with regression tests. 231 tests green, ruff+mypy clean (2026-08-02)
+- **Buffy / deepseek-v4-flash — session 17:** implemented the first Wi-Fi foundation slice (credential-free immutable models, adapter protocol, cancellation, capability errors, safe serialization) without hardware access. Reviewer caught a real risk of persisting sensitive portal URL/error values; added redaction and regression tests. Final gates: 245 tests, Ruff clean, strict mypy clean across 40 source files (2026-08-02)
