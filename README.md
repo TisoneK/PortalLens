@@ -52,8 +52,9 @@ portallens \
     "http://maz.wifi/login?dst=..." \
     "https://captive.ispman.tech/hotspots/.../select?..."
 
-# Same analysis, opened in the interactive investigation console
-# (needs the [tui] extra)
+# Same analysis, opened in the LIVE investigation console — streamed
+# activity feed + keyboard controls (1-9 run next steps, p=probe,
+# m=monitor, s=save, e=export; needs the [tui] extra)
 portallens tui "http://maz.wifi/login?dst=..."
 
 # Persist, list, re-render, and extend an investigation
@@ -69,7 +70,7 @@ portallens step <id> resolve_dns
 |---|---|
 | `portallens <urls>...` | Shortcut for `analyze` — passive analysis, Markdown report on stdout |
 | `portallens analyze <urls>...` | Explicit analysis; add `--format sarif`, `-o <file>`, `--notes` |
-| `portallens tui <urls>...` | Same analysis, opened in the interactive console (TUI) |
+| `portallens tui <urls>...` | Live investigation console — report panels, streaming activity feed, and controls to run next steps / probes / save / export (`--auto`, `--monitor`, `--monitor-interval`) |
 | `portallens investigate <urls>...` | Analyze and save as a persisted investigation |
 | `portallens investigations` | List saved investigations, newest first |
 | `portallens show <id> [--audit]` | Re-render a saved report (or its audit trail) |

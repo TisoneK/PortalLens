@@ -31,8 +31,10 @@ from textual.widgets.tree import TreeNode
 from portallens.portal import PortalRelationship, PortalReport
 from portallens.tui.theme import (
     WIDE_THRESHOLD,
+    auth_badge,
     confidence_label_text,
     confidence_markup,
+    mode_badge,
     observation_heading,
     relationship_kind_label,
 )
@@ -59,6 +61,49 @@ class _ReportText(Static):
 
     def on_mount(self) -> None:
         self.update(self._build_text())
+
+    def refresh_content(self) -> None:
+        """Re-render this panel from the current report (live update).
+
+        Called by the app after an action appended evidence or otherwise
+        changed the report — the panel reflects the new state without
+        being recreated.
+        """
+
+        self.update(self._build_text())
+
+
+class StatusBar(Static):
+    """The live status line — target, authorization, mode, counters.
+
+    Rendered with the engine's current report state plus the app's
+    authorization flag and console mode. Text is the carrier of meaning;
+    colour is additive (ADR-7 — never colour alone).
+    """
+
+    def __init__(self) -> None:
+        super().__init__("")
+
+    def render_state(
+        self,
+        report: PortalReport,
+        authorized: bool,
+        mode: str,
+        busy: bool,
+    ) -> None:
+        """Update the line from the live report + console state."""
+
+        busy_mark = " [bold red]RUNNING[/bold red]" if busy else ""
+        self.update(
+            Text.from_markup(
+                f"Target: [bold]{escape(report.primary_url)}[/bold]\n"
+                f"{auth_badge(authorized)}  {mode_badge(mode)}  "
+                f"[cyan]{len(report.evidence)}[/cyan] evidence · "
+                f"[cyan]{len(report.findings)}[/cyan] findings · "
+                f"[cyan]{len(report.open_questions)}[/cyan] open questions"
+                f"{busy_mark}"
+            )
+        )
 
 
 class ReportHeader(_ReportText):
@@ -170,6 +215,15 @@ class RelationshipTree(Tree[object]):
         self.show_root = True
 
     def on_mount(self) -> None:
+        self._populate()
+
+    def rebuild(self) -> None:
+        """Rebuild the tree from the current report (live update)."""
+
+        self.clear()
+        self._populate()
+
+    def _populate(self) -> None:
         from urllib.parse import urlparse
 
         r = self._report

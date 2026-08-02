@@ -298,11 +298,37 @@ def analyze(
 @_PORTAL_TYPE_OPTION
 @_AUTHORIZED_OPTION
 @_NOTES_OPTION
+@_DB_OPTION
+@click.option(
+    "--auto",
+    "auto_start",
+    is_flag=True,
+    default=False,
+    help="Auto-run the next analysis step at launch (and when new steps become available).",
+)
+@click.option(
+    "--monitor",
+    is_flag=True,
+    default=False,
+    help="Start in continuous monitor mode: re-probe admin ports every --monitor-interval seconds. Requires --authorized.",
+)
+@click.option(
+    "--monitor-interval",
+    "monitor_interval",
+    type=float,
+    default=5.0,
+    show_default=True,
+    help="Seconds between monitor probes.",
+)
 def tui(
     urls: tuple[str, ...],
     portal_type: str,
     authorized: bool,
     notes: str | None,
+    db_path: str | None,
+    auto_start: bool,
+    monitor: bool,
+    monitor_interval: float,
 ) -> None:
     """Analyze portal URLs, then open the investigation-console TUI.
 
@@ -330,7 +356,33 @@ def tui(
         )
         sys.exit(2)
 
-    app = PortalLensApp(report)
+    # The console holds an Investigation (ADR-8) and auto-saves it so the
+    # session survives the process; `s` inside the TUI re-saves after
+    # running steps. Persistence is the CLI's job, not the app's.
+    from portallens.investigation import Investigation, InvestigationStore
+
+    investigation = Investigation.start(
+        report,
+        portal_type=PortalType(portal_type.lower()),
+        user_notes=notes,
+    )
+    with InvestigationStore(db_path) as store:
+        store.save(investigation)
+    echo(
+        f"Investigation {investigation.id} auto-saved — inspect later with "
+        f"`portallens show {investigation.id}` (press `s` in the console to "
+        "re-save after running steps).",
+        err=True,
+    )
+
+    app = PortalLensApp(
+        investigation,
+        policy=AcquisitionPolicy(authorized=authorized),
+        auto_start=auto_start,
+        monitor=monitor,
+        monitor_interval=monitor_interval,
+        db_path=db_path,
+    )
     # run() blocks until the user quits. run_async() would await; the
     # CLI is synchronous so run() is correct here.
     app.run()

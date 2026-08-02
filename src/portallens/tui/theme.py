@@ -54,6 +54,31 @@ def confidence_markup(value: int) -> str:
     return f"[{style}]\\[{label.value} · {value}%][/{style}]"
 
 
+def auth_badge(authorized: bool) -> str:
+    """Textual markup for the authorization badge: ``AUTH: authorized``.
+
+    The label text is always present; colour is additive only (ADR-7 —
+    never colour alone). A monochrome terminal reads the same words.
+    """
+
+    if authorized:
+        return "[bold green]AUTH: authorized[/bold green]"
+    return "[bold yellow]AUTH: passive[/bold yellow]"
+
+
+def mode_badge(mode: str) -> str:
+    """Textual markup for the console-mode badge: ``MODE: console``.
+
+    Modes are ``console`` (on-demand), ``auto`` (auto-run next steps),
+    and ``monitor`` (continuous probing). Text is the carrier; colour is
+    additive.
+    """
+
+    styles = {"console": "bold", "auto": "bold cyan", "monitor": "bold magenta"}
+    style = styles.get(mode, "bold")
+    return f"[{style}]MODE: {mode}[/{style}]"
+
+
 def confidence_label_text(value: int) -> str:
     """The plain-text label+percentage, no markup: ``low · 35%``.
 

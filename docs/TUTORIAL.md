@@ -201,7 +201,7 @@ Two things to look for in every report:
 
 ---
 
-## 5. The interactive console (`tui`)
+## 5. The live investigation console (`tui`)
 
 ```bash
 portallens tui \
@@ -209,26 +209,50 @@ portallens tui \
     "https://captive.ispman.tech/hotspots/.../select?..."
 ```
 
-The TUI runs the same analysis as `analyze`, then opens an interactive
-terminal console with:
+`tui` runs the same analysis as `analyze`, then opens a **live
+investigation console** over an auto-saved investigation: report panels
+on top (relationship tree, observations, evidence, open questions), a
+timestamped **activity feed** at the bottom, and a **status bar** (target,
+AUTH badge, console mode, live evidence / findings / open-question
+counters). It is a pure control layer - the analysis logic stays in the
+engine; the console issues engine commands (registered steps, probes)
+and re-renders as evidence lands.
 
-- a **relationship tree** (the one screen that beats Markdown),
-- **confidence-badged observations**,
-- the **evidence list**, and
-- **open questions**.
+### Controls (also shown in the footer)
 
-It is a pure presentation layer — it renders a `PortalReport` the engine
-already produced and contains no analysis logic. It is responsive from
-~40 columns (Termux, portrait) to wide desktop: panels stack on narrow
-terminals and sit side-by-side on wide ones. Severity and status are
-never colour-only — every confidence badge carries its label text next to
-its percentage.
+| Key | Action |
+|---|---|
+| `1`-`9` | Run the Nth computed next-step (the open questions' "Resolves with" steps - e.g. 1=resolve_dns, 2=ip_asn_lookup) |
+| `n` | Run the next available step (auto-picked) |
+| `p` | Admin-port probe pass (requires `--authorized`) |
+| `m` | Toggle continuous monitor mode - re-probes on an interval, logs only port changes (requires `--authorized`) |
+| `a` | Toggle auto-run - kicks off the next step automatically as one becomes available |
+| `s` | Re-save the investigation (it is auto-saved at launch) |
+| `e` | Export the current report as Markdown to a file |
+| `r` | Re-render all panels |
+| `q` | Quit |
 
-Requires the `[tui]` extra: `pip install -e ".[tui]"`. Quit with
-`Ctrl+C`.
+Actions run in background workers - the UI stays responsive, results
+stream into the activity feed, counters bump, and open questions that
+the new evidence answers disappear (the engine's loop closure).
+
+### Launch options
+
+```bash
+portallens tui --authorized <urls>                          # unlock active actions
+portallens tui --auto <urls>                                # auto-run next steps
+portallens tui --monitor --monitor-interval 10 <urls>       # continuous probing (needs --authorized)
+```
+
+The console is **passive by default**: without `--authorized`, active
+keys are refused with a hint line in the feed. It is responsive from
+~40 columns (Termux, portrait) to wide desktop, and severity/status are
+never colour-only - every confidence badge carries its label text next
+to its percentage.
+
+Requires the `[tui]` extra: `pip install -e ".[tui]"`. Quit with `q`.
 
 ---
-
 ## 6. Saved investigations and analysis steps
 
 Analysis can be persisted instead of printed. An **investigation**
