@@ -182,3 +182,12 @@ past entries — append corrections instead.
 - **Outcome:** done — added `src/portallens/wifi/` with immutable credential-free models, lifecycle state machine, capability/error types, cancellation token, runtime-checkable adapter protocol, capability gate, and explicit redacted serialization. Added 14 focused tests and changelog entry. Product commit ec62769 pushed to origin/main.
 - **Open items:** Wi-Fi platform adapters; TUI picker/live session orchestration; RFC 8908/8910 and platform probe captive detection; SQLite live-event persistence (all appended to `tasks/backlog.md`).
 - **Report:** `.context/memory/reviews/2026-08-02-feature-review.md`
+
+---
+## 2026-08-02 — Session 18
+- **Agent:** Buffy | **Model:** deepseek-v4-flash | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer / feature-engineer | **Core:** 0.5.0
+- **Task:** Implement deterministic read-only Windows/macOS/Linux Wi-Fi discovery and status adapters behind the Session-17 credential-free contract. No credentials, association, packet operations, browser launch, or bypass execution.
+- **Commits:** 1 product (`fb99e47`) + context commit pending — `feat(wifi): add read-only desktop adapters`
+- **Outcome:** done — added injectable shell-free command execution with bounded, interruptible cancellation; Windows `netsh`, macOS `airport`/`networksetup`, and Linux `nmcli` adapters; normalized parsers and 11 fixture-driven tests. Final suite: 256 passed; Ruff and strict mypy clean across 42 source files.
+- **Open items:** Wi-Fi TUI picker/live orchestration, captive-portal probe profiles, and live-event persistence remain in the backlog.
+- **Report:** `.context/memory/reviews/2026-08-02-wifi-adapters-review.md`; notes: `.context/memory/sessions/2026-08-02-18/notes.md`

@@ -207,3 +207,11 @@ if literally nothing slowed you down.
 - **Cause:** Whole-file writes were used for append-only files despite the protocol's append-only rule. The staged diff showed hundreds of deletions, but the first commit command did not stop on that review signal.
 - **Workaround / fix:** Restored the four files from the true pre-session baseline `bb94df4`, re-appended their Session 17 entries with shell append operations, and will push the repair as a separate context commit.
 - **Prevent next time:** Never use `write_file` on append-only context files. Before committing context, require `git diff --cached --numstat` to show zero deletions for append-only paths and abort if any deletion appears.
+
+---
+## 2026-08-02 — Buffy / Session 18
+- **Problem:** An attempted append to the append-only ADR file used the file-write operation and replaced the prior decision history instead of appending. A syntax cleanup also briefly joined an import block to the following constant in a test file.
+- **Cost:** ~10 min restoring `plans/decisions.md` from the shipped product commit, re-appending ADR-21 with shell redirection, and repairing the test syntax before final gates.
+- **Cause:** Used a whole-file writer for an append-only context file and applied a replacement against text that had already changed.
+- **Workaround / fix:** Restored from `fb99e47`, used `cat >>` with a heredoc, verified ADR-20 remained and `git diff --numstat` showed 7 additions / 0 deletions; repaired the import separator and reran all gates.
+- **Prevent next time:** Treat append-only context files as shell-append-only. Before any append, anchor from the file tail; after appending, compare against the pre-session baseline and require zero deletions.

@@ -94,3 +94,9 @@ don't remove the line.
 - [ ] **Captive-portal detection for live Wi-Fi sessions** (added 2026-08-02 by Buffy / Session 17) — add standards-aware RFC 8908/8910 metadata handling plus platform connectivity-probe profiles. Capture bounded redirect/status evidence and feed the existing passive captive-Wi-Fi analyzer; do not open a browser or automatically invoke bypass probes.
 
 - [ ] **Wi-Fi live-event persistence** (added 2026-08-02 by Buffy / Session 17) — append a SQLite migration and serialized event path for scan snapshots, connection states, portal detection, cancellation, target switching, and worker failures. Redact credentials, tokens, raw command output, and sensitive URL values before persistence.
+
+---
+- [x] **Wi-Fi platform adapters** — DONE 2026-08-02 (Buffy / Session 18, `fb99e47`) — added deterministic read-only Windows `netsh`, macOS `airport`/`networksetup`, and Linux NetworkManager `nmcli` adapters behind `portallens.wifi.WifiAdapter`, with normalized parser fixtures, typed command failures, capability gates, and interruptible cancellation. No credentials or packet-level operations.
+- [ ] **Wi-Fi TUI picker and live session orchestration** — next slice over the adapter boundary; keep platform commands outside `tui/`, with cancellation and session-generation guards.
+- [ ] **Captive-portal detection for live Wi-Fi sessions** — next slice after picker; use standards-aware probe profiles and bounded redirect/status evidence without browser launch or automatic bypass execution.
+- [ ] **Wi-Fi live-event persistence** — next persistence slice; append a SQLite migration for redacted scan/connection/portal/cancellation/session-switch events.

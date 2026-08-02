@@ -83,3 +83,8 @@ records.
 ---
 - **2026-08-02 — Session 17** — Buffy / deepseek-v4-flash — shipped the first safe Wi-Fi foundation slice in `portallens.wifi`: credential-free immutable network/connection models, lifecycle states, cancellation, capability/error types, adapter protocol, and persistence-safe redaction. ADR-20 records the contract-first decision; reviewer caught and fixed sensitive portal URL/error persistence risk. Product commit `ec62769`; 245 tests green, Ruff/mypy clean.
   Detail: .context/memory/reviews/2026-08-02-feature-review.md
+
+---
+- **2026-08-02 — Session 18** — Buffy / deepseek-v4-flash — shipped read-only desktop Wi-Fi adapters: Windows `netsh`, macOS `airport`/`networksetup`, Linux `nmcli`, injectable shell-free command runner, typed failures, interruptible cancellation, normalized parsers, and fixture tests. 256 tests green; Ruff + strict mypy clean.
+  Key decision: adapters expose scan/status only; association, credentials, packet operations, browser launch, and bypass execution remain outside this slice. ADR-21 records the strategy.
+  Detail: .context/memory/sessions/2026-08-02-18/notes.md
