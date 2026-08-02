@@ -1,8 +1,11 @@
 """Cross-platform Wi-Fi discovery and OS-mediated connection contracts.
 
-The platform adapters in this package are read-only in this slice: they scan
-and report host-reported status, while credentials and association operations
-remain intentionally absent from the implementation boundary.
+The platform adapters and session controller in this package are read-only in
+this slice: they scan, report host status, and coordinate selection, while
+credentials, association, packet operations, browser launch, and bypass
+operations remain outside the implementation boundary. The Textual picker is
+available from :mod:`portallens.wifi.picker` and is intentionally not imported
+here so core imports stay dependency-free.
 """
 
 from portallens.wifi.adapter import WifiAdapter, ensure_capability
@@ -36,6 +39,7 @@ from portallens.wifi.models import (
     WifiNetwork,
     WifiSecurity,
 )
+from portallens.wifi.session import WifiPickerPhase, WifiPickerState, WifiSessionController
 
 __all__ = [
     "CancellationToken",
@@ -55,7 +59,10 @@ __all__ = [
     "WifiOperationCancelled",
     "WifiOperationTimeout",
     "WifiPermissionError",
+    "WifiPickerPhase",
+    "WifiPickerState",
     "WifiSecurity",
+    "WifiSessionController",
     "WifiUnsupportedOperation",
     "WindowsWifiAdapter",
     "adapter_for_platform",

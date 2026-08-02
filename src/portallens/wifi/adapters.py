@@ -390,17 +390,18 @@ def adapter_for_platform(
     system: str | None = None,
     *,
     runner: CommandRunner | None = None,
+    interface: str | None = None,
 ) -> WifiAdapter:
     """Create the read-only adapter matching a desktop platform name."""
 
     platform_name = (system or platform.system()).lower()
     selected_runner = runner or SubprocessCommandRunner()
     if platform_name in {"windows", "win32"}:
-        return WindowsWifiAdapter(selected_runner)
+        return WindowsWifiAdapter(selected_runner, interface=interface)
     if platform_name in {"darwin", "mac", "macos"}:
-        return MacOSWifiAdapter(selected_runner)
+        return MacOSWifiAdapter(selected_runner, interface=interface or "en0")
     if platform_name == "linux":
-        return LinuxWifiAdapter(selected_runner)
+        return LinuxWifiAdapter(selected_runner, interface=interface)
     raise WifiAdapterUnavailable(f"unsupported Wi-Fi platform: {system or platform.system()}")
 
 

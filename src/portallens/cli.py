@@ -399,6 +399,46 @@ def tui(
 # ---------------------------------------------------------------------------
 
 
+@main.command(name="wifi")
+@click.option(
+    "--platform",
+    "platform_name",
+    type=click.Choice(["windows", "darwin", "linux"], case_sensitive=False),
+    default=None,
+    help="Desktop platform adapter to use; defaults to the current host platform.",
+)
+@click.option(
+    "--interface",
+    default=None,
+    help="Optional Wi-Fi interface name (for example, en0 or wlan0).",
+)
+def wifi(platform_name: str | None, interface: str | None) -> None:
+    """Scan and select a Wi-Fi network without connecting to it.
+
+    The picker is read-only in this slice: it never accepts credentials,
+    associates with a network, opens a browser, or invokes portal/bypass work.
+    """
+
+    from portallens.wifi import WifiAdapterUnavailable, adapter_for_platform
+
+    try:
+        from portallens.wifi.picker import WifiPickerApp
+
+        adapter = adapter_for_platform(platform_name, interface=interface)
+        WifiPickerApp(adapter).run()
+    except ImportError as exc:
+        echo(
+            "The Wi-Fi picker requires the 'tui' extra. Install it with:\n"
+            "    pip install -e \".[tui]\"\n"
+            f"(underlying import error: {exc})",
+            err=True,
+        )
+        sys.exit(2)
+    except WifiAdapterUnavailable as exc:
+        echo(f"Wi-Fi unavailable: {exc}", err=True)
+        sys.exit(2)
+
+
 @main.command(name="investigate")
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
