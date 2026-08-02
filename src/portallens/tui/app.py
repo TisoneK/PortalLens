@@ -47,6 +47,7 @@ questions that the new evidence answers disappear via the engine's
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 from urllib.parse import urlparse
@@ -60,7 +61,7 @@ from textual.timer import Timer
 from textual.widgets import Footer, Header, RichLog
 
 from portallens.acquisition import AcquisitionDenied
-from portallens.evidence import Evidence
+from portallens.evidence import Evidence, EvidenceType
 from portallens.investigation.models import Investigation
 from portallens.portal import AcquisitionPolicy, SecurityFinding
 from portallens.reporting import render_markdown
@@ -317,17 +318,11 @@ class PortalLensApp(App[None]):
             return
         self._set_busy(True)
         self._feed(f"running [bold]{escape(step.label)}[/bold] ({step.slug}) …")
-        self._step_worker(step)
-
-    @work(thread=True, exclusive=True)
-    def _step_worker(self, step: AnalysisStep) -> None:
-        try:
-            evidence = step.run(self._investigation, self._policy)
-        except AcquisitionDenied as exc:
-            self.call_from_thread(self._feed, f"[yellow]refused[/yellow] {escape(str(exc))}")
-            self.call_from_thread(self._set_busy, False)
-            return
-        self.call_from_thread(self._stream_evidence, evidence, step.slug, step.label)
+        self._action_worker(
+            lambda: step.run(self._investigation, self._policy),
+            label=step.label,
+            slug=step.slug,
+        )
 
     # ------------------------------------------------------------------
     # Admin-port probe (NetAudit, authorized only)
@@ -346,24 +341,48 @@ class PortalLensApp(App[None]):
             return
         self._set_busy(True)
         self._feed(f"probing admin ports on {escape(', '.join(hosts))} …")
-        self._probe_worker(quiet=False)
 
-    @work(thread=True, exclusive=True)
-    def _probe_worker(self, quiet: bool = False) -> None:
         from portallens.security.audit import probe_admin_ports
 
-        hosts = hosts_from_report(self._investigation.report)
+        self._action_worker(
+            lambda: probe_admin_ports(hosts, self._policy),
+            label="admin port probe",
+            slug="netaudit",
+        )
+
+    @work(thread=True, exclusive=True)
+    def _action_worker(
+        self,
+        action: Callable[[], list[Evidence]],
+        *,
+        label: str,
+        slug: str,
+        quiet: bool = False,
+    ) -> None:
+        """Run one engine action in a background worker (single-flight).
+
+        One exclusive worker serves every action, so a step and a probe
+        can never overlap — the busy flag is race-free. Any exception
+        (not just :class:`AcquisitionDenied`) logs to the feed and
+        clears busy, so a failing action can never wedge the console.
+        """
+
         try:
-            evidence = probe_admin_ports(hosts, self._policy)
+            evidence = action()
         except AcquisitionDenied as exc:
             self.call_from_thread(self._feed, f"[yellow]refused[/yellow] {escape(str(exc))}")
             self.call_from_thread(self._set_busy, False)
             return
+        except Exception as exc:
+            self.call_from_thread(
+                self._feed, f"[red]{escape(label)} failed[/red] {escape(str(exc))}"
+            )
+            self.call_from_thread(self._set_busy, False)
+            return
         if quiet:
-            # Monitor tick: apply quietly (delta reporting handles the feed).
-            self.call_from_thread(self._apply_evidence, evidence, "netaudit")
+            self.call_from_thread(self._apply_evidence, evidence, slug, refresh=False)
         else:
-            self.call_from_thread(self._stream_evidence, evidence, "netaudit", "admin port probe")
+            self.call_from_thread(self._stream_evidence, evidence, slug, label)
 
     # ------------------------------------------------------------------
     # Evidence handling — append, recompute, re-render (engine calls only)
@@ -381,19 +400,24 @@ class PortalLensApp(App[None]):
         self._apply_evidence(evidence, step_slug)
 
     def _apply_evidence(
-        self, evidence: list[Evidence], step_slug: str
+        self, evidence: list[Evidence], step_slug: str, *, refresh: bool = True
     ) -> None:
-        """Append evidence, recompute findings/questions, re-render live.
+        """Append deduplicated evidence, recompute, re-render live.
 
         The recompute uses the engine's own functions — ``run_checks``
         over the enriched evidence and ``refine_open_questions`` to close
         the questions the new evidence answers (ADR-9 loop closure) —
         exactly what the CLI ``step`` verb does. This is the control
         layer issuing engine commands, not analysis logic in the TUI.
+
+        ``refresh=False`` is used by the quiet monitor tick: the full
+        re-render is skipped unless new evidence or a port change made
+        the screen stale.
         """
 
-        if evidence:
-            self._investigation.append_evidence(evidence, step=step_slug)
+        fresh = self._dedupe_evidence(evidence)
+        if fresh:
+            self._investigation.append_evidence(fresh, step=step_slug)
         report = self._investigation.report
         self._investigation.report = report.model_copy(
             update={
@@ -404,11 +428,25 @@ class PortalLensApp(App[None]):
             }
         )
         self._set_busy(False)
-        self._refresh_all()
-        if self._monitor_enabled:
-            self._update_open_ports(evidence)
+        changed = self._update_open_ports(evidence) if self._monitor_enabled else False
+        if refresh or fresh or changed:
+            self._refresh_all()
         if self._auto_run:
             self._schedule_next()
+
+    def _dedupe_evidence(self, evidence: list[Evidence]) -> list[Evidence]:
+        """Drop records already present on the report (type, source, key, value).
+
+        Keeps re-running a step (or the monitor re-probing the same
+        ports) from inflating the evidence list with duplicates.
+        """
+
+        existing = {
+            (ev.type, ev.source, ev.key, ev.value) for ev in self._investigation.report.evidence
+        }
+        return [
+            ev for ev in evidence if (ev.type, ev.source, ev.key, ev.value) not in existing
+        ]
 
     def _schedule_next(self) -> None:
         """Auto-run mode: kick off the next available step, if any."""
@@ -454,26 +492,36 @@ class PortalLensApp(App[None]):
     def _monitor_tick(self) -> None:
         if self._busy:
             return
-        self._probe_worker(quiet=True)
 
-    def _update_open_ports(self, evidence: list[Evidence]) -> None:
-        """Log which admin ports newly opened/closed since the last probe."""
+        from portallens.security.audit import probe_admin_ports
+
+        hosts = hosts_from_report(self._investigation.report)
+        self._action_worker(
+            lambda: probe_admin_ports(hosts, self._policy),
+            label="admin port probe",
+            slug="netaudit",
+            quiet=True,
+        )
+
+    def _update_open_ports(self, evidence: list[Evidence]) -> bool:
+        """Log admin ports that newly opened/closed; True if anything changed."""
 
         current = {
             (host, port)
             for ev in evidence
-            if ev.type.value == "service_reachable"
+            if ev.type is EvidenceType.SERVICE_REACHABLE
             for host, port in _port_pairs(ev)
         }
         new_ports = current - self._last_open_ports
         gone_ports = self._last_open_ports - current
         if not new_ports and not gone_ports:
-            return
+            return False
         self._last_open_ports = current
         for host, port in sorted(new_ports):
             self._feed(f"[bold green]monitor: port {port} OPEN[/bold green] on {host}")
         for host, port in sorted(gone_ports):
             self._feed(f"[yellow]monitor: port {port} CLOSED[/yellow] on {host}")
+        return True
 
     # ------------------------------------------------------------------
     # Save / export / refresh / quit

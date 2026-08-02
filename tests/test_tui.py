@@ -492,3 +492,46 @@ class TestLiveConsole:
             await pilot.pause()
         assert not app._monitor_enabled
         assert any("monitor requires --authorized" in line for line in captured)
+
+    @pytest.mark.asyncio
+    async def test_failed_action_clears_busy(self, report, monkeypatch) -> None:
+        # A worker action that raises (not just AcquisitionDenied) must
+        # log the failure and clear the busy flag — never wedge the console.
+        app = _make_app(report)
+        captured: list[str] = []
+        monkeypatch.setattr(app, "_feed", lambda markup: captured.append(markup))
+        async with app.run_test(size=(120, 40)) as pilot:
+            app._set_busy(True)
+
+            def boom() -> list:
+                raise RuntimeError("engine exploded")
+
+            app._action_worker(boom, label="test action", slug="test")
+            await pilot.pause()
+            await pilot.pause()
+        assert app._busy is False
+        assert any("failed" in line for line in captured)
+
+    def test_dedupe_drops_duplicates(self, report) -> None:
+        from portallens.evidence import Evidence
+
+        app = _make_app(report)
+        existing = app._investigation.report.evidence[0]
+        dup = Evidence(
+            type=existing.type,
+            source=existing.source,
+            key=existing.key,
+            value=existing.value,
+        )
+        # A record already on the report is dropped; the dedupe key is
+        # (type, source, key, value) so re-running a step or re-probing
+        # the same port never inflates the evidence list.
+        assert app._dedupe_evidence([dup]) == []
+
+        fresh = Evidence(
+            type=existing.type,
+            source="dns://new.example",
+            key="a",
+            value="192.0.2.9",
+        )
+        assert len(app._dedupe_evidence([fresh])) == 1
