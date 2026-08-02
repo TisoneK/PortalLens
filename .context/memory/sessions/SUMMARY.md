@@ -76,3 +76,6 @@ records.
 ---
 - **2026-08-02 — Session 15** — Buffy / deepseek-v4-flash — docs: README Usage condensed to a quick-start summary + new full tutorial `docs/TUTORIAL.md` (every command with options, report format, TUI, saved investigations, `--authorized`, five bypass probes, library API, troubleshooting). Reviewer caught + fixed one factual error (`--db` listed on `analyze`) and an unverified TUI quit key. 220 tests still green; nothing behavior-changing.
   Detail: .context/memory/reviews/2026-08-02-review-2.md
+
+- **2026-08-02 — Session 16** — Buffy / deepseek-v4-flash — TUI upgraded from static report viewer to a live investigation console over the `Investigation` aggregate: StatusBar (AUTH badge + MODE + live evidence/findings/open-question counters), streaming activity feed, keyboard controls (1-9 next-steps, probe, monitor, auto, save, export, refresh), single-flight workers + evidence dedupe, monitor/auto-run modes, `--auto`/`--monitor`/`--monitor-interval` flags, auto-save at launch. Post-push reviewer caught 3 concurrency bugs (wedged busy on worker exception, duplicate monitor evidence, dual exclusive workers racing the busy flag) — fixed with regression tests in 6056dfc. 231 tests green; ADR-7/ADR-15 invariants held.
+  Detail: .context/memory/reviews/2026-08-02-review-3.md

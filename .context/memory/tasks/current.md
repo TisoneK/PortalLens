@@ -4,6 +4,6 @@ Holds exactly one task — the one being worked on right now. Set it at
 session start (protocol Step 3), clear it at session end (Step 15). If a
 prior session died mid-task, check its session entry and backlog first.
 
-- **Session:** 15 (2026-08-02)
-- **Task:** completed — docs target from chat: "Add how to use the tool in README (summary) but point to full tutorial to a dedicated file". README Usage section condensed to a quick-start summary pointing at the new full tutorial `docs/TUTORIAL.md` (install, all CLI verbs + options, report walkthrough, TUI, saved investigations + steps, `--authorized`, bypass probes, library API, SARIF, troubleshooting). Commits e532198 + 37b5322 pushed to main; CHANGELOG entry added.
+- **Session:** 16 (2026-08-02)
+- **Task:** completed — user critique "TUI still feels like non-tui ... advanced hacking tool-like with live updates and controls". TUI upgraded from static viewer to a live investigation console: StatusBar (AUTH/MODE + live counters), streaming activity feed, keyboard controls (1-9 next-steps, n/p/m/a/s/e/r/q), single-flight workers, evidence dedupe, monitor + auto-run modes, `--auto`/`--monitor`/`--monitor-interval` flags, auto-save at launch. Commits 40917f6 + 6056dfc pushed to main; docs (README/TUTORIAL/CHANGELOG) updated; 231 tests green.
 - **Status:** idle
