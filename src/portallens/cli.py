@@ -33,13 +33,14 @@ TUI on the same URL pair (requires ``pip install -e ".[tui]"``)::
 
 Active analysis — the caller asserts authorization for the target::
 
-    portallens --authorized "https://example.com/login"
+    portallens analyze --authorized "https://example.com/login"
 """
 
 from __future__ import annotations
 
 import sys
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import click
 
@@ -49,6 +50,9 @@ from portallens.plugins.captive_wifi import CaptiveWifiPortal  # noqa: F401 — 
 from portallens.portal import AcquisitionPolicy, AnalysisContext, PortalReport, PortalType
 from portallens.registry import get_portal_class
 from portallens.reporting import render_markdown
+
+if TYPE_CHECKING:
+    from portallens.tui.setup import SetupResult
 
 # ---------------------------------------------------------------------------
 # Shared analysis helper — both subcommands run the same engine call.
@@ -162,6 +166,90 @@ def _render(report: PortalReport, output_format: str) -> str:
     return render_markdown(report)
 
 
+def _open_investigation_console(
+    report: PortalReport,
+    *,
+    portal_type: str,
+    authorized: bool,
+    notes: str | None,
+    db_path: str | None,
+    auto_start: bool,
+    monitor: bool,
+    monitor_interval: float,
+) -> None:
+    """Persist ``report`` and open the live investigation console."""
+
+    from portallens.investigation import Investigation, InvestigationStore
+
+    investigation = Investigation.start(
+        report,
+        portal_type=PortalType(portal_type.lower()),
+        user_notes=notes,
+    )
+    with InvestigationStore(db_path) as store:
+        store.save(investigation)
+    echo(
+        f"Investigation {investigation.id} auto-saved — inspect later with "
+        f"`portallens show {investigation.id}` (press `s` in the console to "
+        "re-save after running steps).",
+        err=True,
+    )
+
+    from portallens.tui import PortalLensApp
+
+    PortalLensApp(
+        investigation,
+        policy=AcquisitionPolicy(authorized=authorized),
+        auto_start=auto_start,
+        monitor=monitor,
+        monitor_interval=monitor_interval,
+        db_path=db_path,
+    ).run()
+
+
+def _launch_primary_setup() -> SetupResult | None:
+    """Open the setup screen used by a bare ``portallens`` invocation."""
+
+    try:
+        from portallens.tui import PortalLensSetupApp, SetupUnavailableAdapter
+        from portallens.wifi import WifiAdapterUnavailable, adapter_for_platform
+
+        try:
+            adapter = adapter_for_platform()
+        except WifiAdapterUnavailable as exc:
+            adapter = SetupUnavailableAdapter(str(exc))
+        return PortalLensSetupApp(adapter).run()
+    except ImportError as exc:
+        echo(
+            "The main setup screen requires the 'tui' extra. Install it with:\n"
+            "    pip install -e \".[tui]\"\n"
+            f"(underlying import error: {exc})",
+            err=True,
+        )
+        return None
+
+
+def _start_from_setup(result: SetupResult) -> None:
+    """Turn a URL chosen in setup into the existing live console."""
+
+    report = _run_analysis(
+        urls=[result.target_url],
+        portal_type=PortalType.CAPTIVE_WIFI.value,
+        authorized=result.authorized and result.active,
+        notes=None,
+    )
+    _open_investigation_console(
+        report,
+        portal_type=PortalType.CAPTIVE_WIFI.value,
+        authorized=result.authorized and result.active,
+        notes=None,
+        db_path=None,
+        auto_start=result.auto_run,
+        monitor=result.monitor,
+        monitor_interval=5.0,
+    )
+
+
 def _run_netaudit(report: PortalReport, policy: AcquisitionPolicy) -> PortalReport:
     """Run the authorized active-assessment pass and merge its results.
 
@@ -248,8 +336,11 @@ def main(ctx: click.Context) -> None:
     """
 
     if ctx.invoked_subcommand is None:
-        # `portallens` with no args at all — show help.
-        echo(ctx.get_help())
+        # Bare `portallens` is the friendly front door. Scriptable callers
+        # still have the explicit `analyze` command and the URL fallback.
+        result = _launch_primary_setup()
+        if result is not None:
+            _start_from_setup(result)
 
 
 @main.command(name="analyze")

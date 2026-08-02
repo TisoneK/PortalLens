@@ -22,6 +22,12 @@ Without the extra, ``import portallens.tui`` raises a clear
 from __future__ import annotations
 
 from portallens.tui.app import PortalLensApp
+from portallens.tui.setup import (
+    PortalLensSetupApp,
+    SetupNetworkItem,
+    SetupResult,
+    SetupUnavailableAdapter,
+)
 from portallens.tui.theme import (
     WIDE_THRESHOLD,
     confidence_label_text,
@@ -46,10 +52,14 @@ __all__ = [
     "ObservationsPanel",
     "OpenQuestionsPanel",
     "PortalLensApp",
+    "PortalLensSetupApp",
     "RelationshipDetail",
     "RelationshipTree",
     "RelationshipView",
     "ReportHeader",
+    "SetupNetworkItem",
+    "SetupResult",
+    "SetupUnavailableAdapter",
     "confidence_label_text",
     "confidence_markup",
     "relationship_kind_label",

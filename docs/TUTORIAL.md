@@ -49,9 +49,9 @@ The three extras in one table:
 | `pip install -e ".[dev]"` | Everything above plus test/lint/typecheck tooling |
 
 The TUI is an optional extra. Without it, `portallens analyze <urls>`
-works but `portallens tui <urls>` prints a clear install hint. A script
-doing `from portallens import PortalReport` never pulls Textual — the TUI
-is lazy-imported inside the `tui` subcommand only.
+works but the setup screen and `portallens tui <urls>` print a clear install
+hint. A script doing `from portallens import PortalReport` never pulls
+Textual — the TUI is lazy-imported only when a screen is opened.
 
 Verify the install:
 
@@ -66,6 +66,21 @@ portallens --version
 ---
 
 ## 2. Quick start
+
+Run the main setup screen:
+
+```bash
+portallens
+```
+
+Choose passive or authorized options, paste a portal URL or scan for a
+nearby Wi-Fi network, then press **Start investigation**. URL targets open
+the live investigation console. Wi-Fi selection is currently read-only host
+status monitoring; it does not connect, open a browser, or detect a portal
+automatically yet. Automatic connection and portal detection are not available
+in the current release.
+
+For scriptable URL analysis:
 
 ```bash
 # Passive analysis (default — no network access)
@@ -307,7 +322,7 @@ Everything active — HTTP fetching, DNS resolution, port scanning, OSINT
 lookups, and the bypass probes — is gated behind **one flag**:
 
 ```bash
-portallens --authorized "https://example.com/login"
+portallens analyze --authorized "https://example.com/login"
 ```
 
 `--authorized` is shared by `analyze`, `tui`, `investigate`, and `step`,
@@ -440,8 +455,13 @@ package isn't installed. `source .venv/bin/activate` (or
 `.venv\Scripts\activate` on Windows) and re-check
 `pip install -e .` from the repo root.
 
-**`portallens tui` prints an install hint and exits** — the `[tui]` extra
-is missing. Install it: `pip install -e ".[tui]"`.
+**`portallens` or `portallens tui` prints an install hint and exits** — the
+`[tui]` extra is missing. Install it: `pip install -e ".[tui]"`.
+
+**The setup screen says Wi-Fi monitoring is read-only** — expected in the
+current release. The desktop adapters can discover networks and report host
+status, but selected-network connection and automatic portal-session
+orchestration are not enabled yet.
 
 **`No investigation with id ...`** — the id was mistyped, or the store is
 at a different path. Check `portallens investigations`, and remember the

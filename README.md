@@ -1,205 +1,115 @@
 # PortalLens
 
-> Intelligence and security analysis for digital portals — captive Wi-Fi first.
-
-PortalLens takes a portal URL (today: a captive Wi-Fi portal URL) and produces an **evidence-backed report** that distinguishes observed facts, inferences, and hypotheses, each carrying an explicit confidence score.
-
-It is built for the situation where you've been redirected through a captive portal (e.g. `maz.wifi` → `captive.ispman.tech`) and want to know:
-
-- What platform is this portal running? (MikroTik RouterOS? CoovaChilli? UniFi? ISPMan? Meraki?)
-- Who operates the underlying Wi-Fi network?
-- Is the redirect target a platform provider, a reseller, or the network operator itself?
-- What can we say with confidence vs. what's speculation?
-
-PortalLens never claims something as fact unless the evidence supports it. Hypotheses are explicitly labelled and capped at `low` confidence by convention.
-
-## Status
-
-Alpha — captive Wi-Fi passive analysis and bounded bypass detection are implemented and tested against a real ISPMan URL pair. The MikroTik and ISPMan signatures are validated against that capture; the CoovaChilli, UniFi, and Meraki signatures come from vendor documentation and have not yet been checked against a captured URL, which the report says wherever one of them fires. Active security assessment is gated behind explicit authorization.
+PortalLens helps you understand captive Wi-Fi portals and keep a clear record of an investigation. It shows what was observed, what the evidence suggests, and what still needs checking.
 
 ## Install
+
+PortalLens requires Python 3.10 or newer.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"      # library + CLI + dev tools (includes the TUI extra)
-# or, for just the library + CLI:
-pip install -e .
-# or, for the TUI only:
 pip install -e ".[tui]"
 ```
 
-The TUI is an optional extra (ADR-7): `pip install -e ".[tui]"` pulls Textual.
-Without it, `portallens analyze <urls>` works but `portallens tui <urls>`
-prints a clear install hint. A script doing
-`from portallens import PortalReport` never pulls Textual — the TUI is
-lazy-imported inside the `tui` subcommand only.
+On Windows, activate the environment with `.venv\Scripts\activate`.
 
-## Usage
+## Start here
 
-The full, step-by-step tutorial lives in **[`docs/TUTORIAL.md`](docs/TUTORIAL.md)** — every command with all its options, the report walkthrough, saved investigations, the library API, the authorized bypass probes, and troubleshooting. This section is the quick tour.
-
-### Quick start
+Run PortalLens without arguments:
 
 ```bash
-# Passive analysis (default — no network access)
-portallens "http://maz.wifi/login?dst=..."
-
-# Two URLs: the local captive host + the external portal it redirected to.
-# The pair lets the relationship analyzer infer REDIRECTS_TO, USES_PLATFORM,
-# OPERATES_NETWORK, etc.
-portallens \
-    "http://maz.wifi/login?dst=..." \
-    "https://captive.ispman.tech/hotspots/.../select?..."
-
-# Same analysis, opened in the LIVE investigation console — streamed
-# activity feed + keyboard controls (1-9 run next steps, p=probe,
-# m=monitor, s=save, e=export; needs the [tui] extra)
-portallens tui "http://maz.wifi/login?dst=..."
-
-# Persist, list, re-render, and extend an investigation
-portallens investigate "http://maz.wifi/login?dst=..."
-portallens investigations
-portallens show <id>
-portallens step <id> resolve_dns
+portallens
 ```
 
-### Bounded captive-portal detection
+This opens the main setup screen. From there you can:
 
-The Wi-Fi library also exposes authorized, non-following connectivity probes
-for Windows, Apple, Android, GNOME, and Firefox-style checks, plus RFC 8908
-Captive Portal API (RFC 8908) parsing. RFC 8910 DHCP/RA option decoding is
-not included yet; callers provide the already-provisioned endpoint and assert
-its source with `provisioned=True`. They capture redirect/status evidence and can hand
-a validated portal URL to the existing passive analyzer without opening a
-browser or submitting credentials. The current slice is a library seam; it is
-not yet wired into the picker/TUI or SQLite live-event stream.
+1. Choose whether the investigation is passive or authorized for active checks.
+2. Turn on recommended follow-up steps or continuous monitoring.
+3. Paste a captive-portal URL, or scan and select a nearby Wi-Fi network.
+4. Review the choices and press **Start investigation**. For a Wi-Fi-only target, enable **Enable continuous monitoring**; this starts read-only monitoring. Automatic connection and portal detection are not available yet.
 
-```python
-from portallens.portal import AcquisitionPolicy
-from portallens.wifi import ANDROID_GENERATE_204, CaptivePortalDetector
+The setup screen is designed to be the normal PortalLens experience. It keeps the important choices visible, explains what each option does, and shows live activity while the session runs.
 
-result = CaptivePortalDetector().probe(
-    ANDROID_GENERATE_204,
-    AcquisitionPolicy(authorized=True),
-)
-```
+Wi-Fi discovery is read-only in the current release. Selecting a network does not enter a password, change the computer's connection, open a browser, or submit anything to the network. The operating system remains responsible for connecting to Wi-Fi. The Wi-Fi-only setup path currently shows status reported by your computer; it does not yet turn a selected network into a portal investigation automatically.
 
-Only fixed legacy profiles are accepted. RFC 8908 endpoints must be HTTPS and
-explicitly provisioned by the host OS (`provisioned=True`); redirects are
-captured but never followed.
+## What happens during an investigation?
 
-### Command surface
+For a portal URL, PortalLens opens the live investigation console. The console shows:
 
-| Command | What it does |
+- the target and current mode;
+- detected portal platforms;
+- observations and confidence levels;
+- relationships between the portal and other services;
+- captured evidence;
+- unanswered questions and suggested next steps;
+- a live activity feed.
+
+You can save the investigation, export a Markdown report, run an authorized follow-up step, or stop monitoring at any time.
+
+## Direct commands
+
+The setup screen is recommended, but the command line remains available for scripts and repeatable workflows:
+
+| Command | Purpose |
 |---|---|
-| `portallens <urls>...` | Shortcut for `analyze` — passive analysis, Markdown report on stdout |
-| `portallens analyze <urls>...` | Explicit analysis; add `--format sarif`, `-o <file>`, `--notes` |
-| `portallens tui <urls>...` | Live investigation console — report panels, streaming activity feed, and controls to run next steps / probes / save / export (`--auto`, `--monitor`, `--monitor-interval`) |
-| `portallens investigate <urls>...` | Analyze and save as a persisted investigation |
-| `portallens investigations` | List saved investigations, newest first |
-| `portallens show <id> [--audit]` | Re-render a saved report (or its audit trail) |
-| `portallens step <id> <slug>` | Run one analysis step against a saved investigation (`resolve_dns`, `ip_asn_lookup`) |
+| `portallens` | Open the main setup screen |
+| `portallens analyze URL...` | Produce a report and exit |
+| `portallens tui URL...` | Open the live console for known URL(s) |
+| `portallens investigate URL...` | Analyze and save an investigation |
+| `portallens investigations` | List saved investigations |
+| `portallens show ID` | View a saved report |
+| `portallens show ID --audit` | View the investigation activity history |
+| `portallens step ID NAME --authorized` | Run an authorized follow-up step |
+| `portallens wifi` | Open the read-only Wi-Fi picker |
 
-### Passive by default — active only with `--authorized`
-
-Analysis never touches the network unless you say so. **One flag —
-`--authorized` — unlocks every active technique** (HTTP fetching, DNS
-resolution, port scanning, OSINT, bypass probes; ADR-15):
+A URL passed directly to `portallens` is still supported for scripts and continues to produce the traditional report:
 
 ```bash
-portallens --authorized "https://example.com/login"
+portallens "http://portal.example/login"
 ```
 
-You are responsible for targets you authorize. **Do not run active
-analysis against networks you do not own or have explicit written
-permission to assess.**
+## Passive by default
 
-### Library use
+PortalLens does not access a target unless you explicitly enable active checks. The setup screen makes this an option; the command line uses `--authorized`.
 
-```python
-from portallens.portal import AnalysisContext
-from portallens.plugins.captive_wifi import CaptiveWifiPortal
-from portallens.reporting import render_markdown
-
-report = CaptiveWifiPortal().analyze(AnalysisContext(urls=[
-    "http://maz.wifi/login?dst=...",
-    "https://captive.ispman.tech/hotspots/.../select?...",
-]))
-print(render_markdown(report))
+```bash
+portallens analyze --authorized "https://portal.example/login"
 ```
 
-### Learn more
+Only use active checks on networks and portals you own or are explicitly permitted to assess. Authorization is your responsibility; the software cannot verify it for you.
 
-The **[full tutorial → `docs/TUTORIAL.md`](docs/TUTORIAL.md)** covers
-each command with its options, how to read a report (confidence model,
-facts vs. inferences vs. hypotheses), the TUI, saved investigations and
-analysis steps, the five authorized bypass probes (`connect_test`,
-`dns_tunnel_test`, `click_through_test`, `port_scan_test`,
-`parameter_tampering_test`), SARIF output, and troubleshooting.
+## Captive-portal detection
 
-## Architecture
+PortalLens can inspect standard connectivity checks used by Windows, Apple devices, Android, GNOME, and Firefox-style environments. It records response and redirect information without automatically following redirects. It can also read an RFC 8908 Captive Portal API response when the endpoint was supplied by the host system.
 
-PortalLens is built around one abstraction: the `Portal`. Every portal type (captive Wi-Fi, web auth, payment, ISP) is a `Portal` subclass registered against a `PortalType`. The CLI dispatches a URL to the right analyzer via the registry.
+The current Wi-Fi flow does not open a browser, submit credentials, or automatically try to get around a portal. It records evidence for the investigation instead.
 
-Within the captive Wi-Fi analyzer, the platforms themselves are data. Everything PortalLens knows about a provider — how to recognize it, what each signal is worth, and whether the rule has ever been checked against a real captured URL — lives in one registry, so adding a provider is a registry entry rather than a code change.
+## Reports
 
-```
-PortalLens
-├── src/portallens/
-│   ├── portal.py              # Portal base + PortalReport + AcquisitionPolicy
-│   ├── confidence.py          # 0–100 confidence + label rubric
-│   ├── evidence.py            # Evidence + Observation (fact / inference / hypothesis)
-│   ├── registry.py            # @register_portal decorator
-│   ├── acquisition/           # URL parsing (passive) + HTTP fetch (active, gated)
-│   ├── security/              # Security checks, NetAudit, bounded bypass probes
-│   ├── reporting/             # Markdown renderer (canonical output)
-│   ├── investigation/         # Investigation aggregate + SQLite store (persistence)
-│   ├── tui/                   # investigation-console TUI (optional [tui] extra)
-│   ├── plugins/
-│   │   └── captive_wifi/      # First plugin — fingerprinting + relationship inference
-│   │       └── signatures.py  # the provider registry — the only file that names a vendor
-│   └── cli.py                 # `portallens` CLI
-├── tests/                     # Unit + end-to-end tests with real ISPMan URL fixture
-└── pyproject.toml
+Reports separate:
+
+- **Observed facts** — information directly present in the supplied evidence.
+- **Inferences** — conclusions supported by one or more signals.
+- **Hypotheses** — possibilities that need more evidence.
+
+Every conclusion has a confidence level. A low-confidence possibility is shown as a possibility, not presented as a fact.
+
+Reports can be written as Markdown or SARIF:
+
+```bash
+portallens analyze "http://portal.example/login" --output report.md
+portallens analyze "http://portal.example/login" --format sarif
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
+## Learn more
 
-## Confidence model
+See [`docs/TUTORIAL.md`](docs/TUTORIAL.md) for a full walkthrough, command reference, saved investigations, reports, and the live console.
 
-Every non-fact statement in a PortalLens report carries an integer confidence in `[0, 100]` and a derived label:
+## Responsible use
 
-| Range | Label | Meaning |
-|---|---|---|
-| 0–19 | `very_low` | Speculative — no direct evidence; could easily be wrong. |
-| 20–39 | `low` | Weak signal — one indirect indicator; treat as a hypothesis. |
-| 40–59 | `medium` | Plausible — multiple indirect indicators or one strong one. |
-| 60–79 | `high` | Likely — strong, specific evidence; alternatives less probable. |
-| 80–100 | `very_high` | Established — direct, unambiguous evidence. |
-
-Multiple independent evidence signals are combined via a noisy-OR rule (`score([w1, w2, …])`) so two medium signals can lift an inference into `high`, but a single speculative signal never escapes `low`.
-
-## What PortalLens does NOT do
-
-- **It does not bypass authentication.** PortalLens analyzes portal URLs passively. It never submits credentials, never tries to skip the captive-portal handshake, and never attempts to obtain free internet access.
-- **It does not actively probe networks without authorization.** Every active technique (HTTP fetch, DNS lookup, port scan, OSINT lookup, or bypass probe) is unlocked by `AcquisitionPolicy(authorized=True)` in the library, or `--authorized` on the CLI (ADR-15). **The caller is responsible for ensuring they have authorization for the target.**
-- **It does not guess.** If the evidence can't distinguish a reseller from an operator using a 3rd-party platform, PortalLens says so — explicitly, as a hypothesis with `low` confidence, and lists what evidence would resolve the question.
-
-## Responsible disclosure
-
-PortalLens is intended for:
-
-- **Operators** assessing their own captive portals before deployment.
-- **Security researchers** with explicit, written authorization to assess a target.
-- **Network auditors** producing evidence-backed reports for responsible disclosure.
-
-The output is structured to support responsible disclosure: every finding cites the evidence it rests on, every inference carries a confidence score, and every gap in the evidence is surfaced as an open question rather than papered over.
+PortalLens is intended for network operators, auditors, and researchers working on systems they own or have permission to assess. Do not run active checks against networks without permission.
 
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
-
-## Agent memory
-
-This repository uses the [`.context/`](https://github.com/TisoneK/.context) protocol for persistent AI agent memory. Every session reads `.context/kickoff.md` first and follows the protocol vendored at `.context/core/`. See [`AGENTS.md`](AGENTS.md) for the short-form agent instructions.
