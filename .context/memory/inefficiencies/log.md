@@ -136,3 +136,12 @@ if literally nothing slowed you down.
 - **Cause:** The word "constraints" legitimately spans both surfaces; I guessed the workflow reading first. And the multi-question ask_user response came back with only Q1 answered — the scope question silently lacked an answer.
 - **Workaround / fix:** Re-scoped to security constraints, then re-asked the scope question alone; the user's answers collapsed the task to "lift the ban, build nothing, records-only".
 - **Prevent next time:** For an ambiguous target spanning workflow vs. project policy, present a *category* question first ("which kind of constraints?") before detailed options. After a multi-question ask_user, verify every question got an answer before proceeding.
+
+---
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 12)
+- **Problem:** Two str_replace attempts on `cli.py` missed on exact-match because my oldString over-escaped quotes inside a triple-quoted docstring (`\"` instead of `"`). Same class of miss hit the `tui` command block on the first pass — the fixes landed only after re-reading the file and matching the real characters.
+- **Cost:** ~3 read/replace rounds per miss instead of one.
+- **Cause:** Copying a docstring from the conversation where quotes had been JSON-escaped, then re-escaping them again in the replacement payload.
+- **Workaround / fix:** Re-read the file and build oldString from the file's literal content (plain `"`, not `\"`).
+- **Prevent next time:** When the oldString spans a docstring, verify quote escaping against the actual file bytes before replacing — or split the replacement to avoid the quoted span entirely.
+- **Also noted:** the `code-searcher` agent returned no output once when spawned with a malformed params object (missing `searchQueries`); re-spawning with the full params object fixed it. And a first validation basher failed with "command not found" for ruff/mypy/python because it didn't source `.venv/bin/activate` — the environment block in `system/environments.md` already records that the tools live in `.venv`, so sourcing the venv first is the standing fix.

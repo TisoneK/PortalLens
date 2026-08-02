@@ -59,3 +59,7 @@ records.
 ---
 - **2026-08-02 — Session 11** — Buffy / deepseek-v4-flash — records-only security-constraint relaxation: ADR-15 (one authorization unlocks all active techniques, supersedes ADR-1/10/13), ADR-16 (assess/exploit ban lifted — nothing built, supersedes ADR-12), ADR-17 (disclosure schema optional). Code alignment backlogged.
   Detail: .context/memory/sessions/2026-08-02-11/notes.md
+
+---
+- **2026-08-02 — Session 12** — Buffy / deepseek-v4-flash — aligned `src/` with ADR-15/17: `AcquisitionPolicy` is one `authorized` boolean; `--i-have-authorization` + `authorize` verb + AuthorizationGrant machinery removed; `analyze`/`tui`/`investigate`/`step` share `--authorized`; `SecurityFinding` prose fields optional with renderers tolerant (ADR-17). 199 tests, ruff + mypy clean. Backlog item checked off; ADR-15/17 notes updated.
+  Detail: .context/memory/sessions/2026-08-02-12/notes.md
