@@ -98,3 +98,7 @@ records.
 - **2026-08-02 — Session 20** — Buffy / deepseek-v4-flash — shipped bounded captive-portal detection: allow-listed platform probes, RFC 8908 parsing, capped non-following redirects, redaction, cancellation, and passive analyzer handoff; 292 tests green. RFC 8910 decoding and live selected-session/TUI/SQLite wiring remain deferred.
   Detail: .context/memory/reviews/2026-08-02-wifi-captive-portal-review.md
 2026-08-02 — Buffy / deepseek-v4-flash — Session 21 setup front door shipped: bare `portallens` opens the setup TUI, URL monitoring requires explicit active authorization, Wi-Fi remains honestly read-only pending orchestration; 300 tests green.
+
+---
+- **2026-08-02 — Session 22** — Buffy / deepseek-v4-flash — fixed the Wi-Fi selection crash and added safe automatic refresh in both TUIs; rendered rows now survive selection-only state updates, stale rows are disabled during scans, and timers clean up on unmount. 309 tests green.
+  Detail: .context/memory/reviews/2026-08-02-review-5.md

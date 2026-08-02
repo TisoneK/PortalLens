@@ -224,3 +224,12 @@ past entries — append corrections instead.
 - **Outcome:** done — setup front door added; URL setup hands off to the existing live console; Wi-Fi discovery/status remains read-only with no-Wi-Fi fallback; URL monitoring requires active checks plus authorization; status workers are cancellation-aware; README/tutorial/changelog are user-facing; 300 tests pass with Ruff and strict mypy clean.
 - **Open items:** selected-session captive detection orchestration, redacted Wi-Fi live-event persistence, RFC 8910 provisioning, and verified Linux profiles remain in `tasks/backlog.md`.
 - **Report:** `.context/memory/reviews/2026-08-02-review-4.md`
+
+---
+## 2026-08-02 — Session 22
+- **Agent:** Buffy | **Model:** deepseek-v4-flash | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer / feature-engineer | **Core:** 0.5.0
+- **Task:** Fix the Wi-Fi selection crash and missing automatic list refresh in the primary setup TUI and standalone Wi-Fi picker.
+- **Commits:** 2 (`6e8aa47` product + context commit pending)
+- **Outcome:** done — selection no longer mutates Textual rows during dispatch; both lists auto-refresh, skip overlapping UI rescans, disable stale rows during scans, and clean up timers on unmount. Added keyboard, callback, cancellation, lifecycle, and timing-safe regression coverage; 309 tests pass.
+- **Open items:** selected-session connection, captive-portal handoff, redacted live-event persistence, and stop/switch orchestration remain the next Wi-Fi feature slice in `tasks/backlog.md` / ADR-24.
+- **Report:** `.context/memory/reviews/2026-08-02-review-5.md`

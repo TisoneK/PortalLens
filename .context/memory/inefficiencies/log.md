@@ -239,3 +239,11 @@ if literally nothing slowed you down.
 - **Cause:** Using the file-write tool for append-only logs instead of restoring and appending with a shell redirection.
 - **Workaround / fix:** Restored `agents/sessions.md`, `sessions/SUMMARY.md`, `inefficiencies/log.md`, and `plans/decisions.md` from `HEAD`, then appended only the new entries with `cat >>`. Verified tails and diff hygiene.
 - **Prevent next time:** Never use whole-file write tools on append-only context files. Use `git show HEAD:file > file` only for recovery, then append with `cat >>`.
+
+---
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 22)
+- **Problem:** Textual's asynchronous ListView mounting made fast repeated rescans timing-sensitive, and the first keyboard regression test did not actually focus the list. Review also identified blocking Event waits inside async tests.
+- **Cost:** Several focused test and harness iterations; no shipped regression.
+- **Cause:** The original renderer treated every generation as a reason to rebuild the DOM, while Textual queues child mounts. Test input focus was assumed rather than made explicit.
+- **Workaround / fix:** Compared stable rendered-row signatures, kept rows during scans while disabling stale interaction, skipped UI rescans during active scans, explicitly focused ListViews, and replaced blocking waits with non-blocking pilot polling. Controlled harness and full suite confirmed repeated scans retain one row and timers stop on unmount.
+- **Prevent next time:** For Textual list tests, explicitly focus the list before keyboard input; never block the event loop waiting for worker events; treat asynchronous child mounting as a DOM lifecycle boundary and avoid unnecessary clear/rebuild operations.
