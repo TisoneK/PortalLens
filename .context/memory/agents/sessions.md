@@ -215,3 +215,12 @@ past entries — append corrections instead.
 - **Correction:** Product commit `bba1063` (`feat(wifi): add bounded captive portal detection`) is present on `main` and pushed to `origin/main`. The earlier Session 20 entry's "product + context pending" wording was stale bookkeeping, not an incomplete product result.
 - **Context status:** Review, ADR-23, backlog, session summary, inefficiency record, and idle task state are now prepared for the separate context commit.
 - **Open items:** RFC 8910 DHCP/RA decoding; selected-session/TUI generation-guarded orchestration; SQLite live-event persistence; verified distro-specific Linux profiles.
+
+---
+## 2026-08-02 — Session 21
+- **Agent:** Buffy | **Model:** deepseek-v4-flash | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer / feature-engineer | **Core:** 0.5.0
+- **Task:** Make the bare `portallens` command launch a polished setup TUI, preserve explicit CLI workflows, improve Wi-Fi setup honesty, and rewrite public docs for users rather than as a devlog.
+- **Commits:** product `pending`; review/context `pending` — prepared as separate logical commits.
+- **Outcome:** done — setup front door added; URL setup hands off to the existing live console; Wi-Fi discovery/status remains read-only with no-Wi-Fi fallback; URL monitoring requires active checks plus authorization; status workers are cancellation-aware; README/tutorial/changelog are user-facing; 300 tests pass with Ruff and strict mypy clean.
+- **Open items:** selected-session captive detection orchestration, redacted Wi-Fi live-event persistence, RFC 8910 provisioning, and verified Linux profiles remain in `tasks/backlog.md`.
+- **Report:** `.context/memory/reviews/2026-08-02-review-4.md`

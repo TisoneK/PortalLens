@@ -41,7 +41,10 @@ again.
 - **OS:** macOS 15 (Darwin 24.6.0), arm64
 - **Runtimes:** system `python3` is **3.9.6** — below this project's `requires-python = ">=3.10"`, so it cannot run PortalLens. Use `/Users/bao/.local/bin/python3.12` (3.12.13). `uv` is also installed at `/Users/bao/.local/bin/uv`. No pyenv, no Homebrew Python on PATH.
 - **Package manager:** pip inside a project `.venv`
-- **Verified commands (Session 17, 2026-08-02):**
+- **Verified commands (Sessions 17-21, 2026-08-02):**
+  - `source .venv/bin/activate && pytest -q` — 300 passed (Session 21)
+  - `source .venv/bin/activate && ruff check .` — All checks passed (Session 21)
+  - `source .venv/bin/activate && mypy src/portallens` — Success: no issues found in 46 source files (Session 21)
   - `source .venv/bin/activate && pytest -q tests/test_wifi.py` — 14 passed
   - `source .venv/bin/activate && ruff check src/portallens/wifi tests/test_wifi.py` — All checks passed
   - `source .venv/bin/activate && mypy src/portallens` — Success: no issues found in 40 source files

@@ -231,3 +231,11 @@ if literally nothing slowed you down.
 - **Cause:** Historical tool-call errors were carried into the resumed turn, and review correctly exposed edge cases (SSRF through arbitrary profiles, overclassification of HTTP errors, state idempotency, and content-type/provenance gaps) after the first implementation.
 - **Workaround / fix:** Continued with available tools, used deterministic injected HTTP seams, applied reviewer findings before the final gate, and verified the full suite after each correction.
 - **Prevent next time:** Treat resumed historical tool errors as non-authoritative noise; run a security-focused review immediately after the first detector draft and keep caller-provenance assertions explicit in the API.
+
+---
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 21)
+- **Problem:** Two append-only context files were initially edited with whole-file writes during the interrupted continuation, which risked losing prior session history; one decisions-file replacement also needed recovery.
+- **Cost:** Several repair/read cycles before committing context; no prior history was lost because each file was restored from `HEAD` before append.
+- **Cause:** Using the file-write tool for append-only logs instead of restoring and appending with a shell redirection.
+- **Workaround / fix:** Restored `agents/sessions.md`, `sessions/SUMMARY.md`, `inefficiencies/log.md`, and `plans/decisions.md` from `HEAD`, then appended only the new entries with `cat >>`. Verified tails and diff hygiene.
+- **Prevent next time:** Never use whole-file write tools on append-only context files. Use `git show HEAD:file > file` only for recovery, then append with `cat >>`.
