@@ -136,8 +136,11 @@ portallens analyze [OPTIONS] URL [URL ...]
   --format [markdown|sarif]
                     Output format. [default: markdown]
   -o, --output PATH Write the report to this path instead of stdout.
-  --db PATH         Investigations database path (see section 6).
 ```
+
+> `analyze` renders and exits — it does not persist anything, so it has
+> no `--db` option. To save the result, use `investigate` (section 6),
+> where the database path lives.
 
 Examples:
 
@@ -221,7 +224,7 @@ terminals and sit side-by-side on wide ones. Severity and status are
 never colour-only — every confidence badge carries its label text next to
 its percentage.
 
-Requires the `[tui]` extra: `pip install -e ".[tui]"`. Quit with `q` or
+Requires the `[tui]` extra: `pip install -e ".[tui]"`. Quit with
 `Ctrl+C`.
 
 ---
