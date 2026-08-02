@@ -145,3 +145,11 @@ if literally nothing slowed you down.
 - **Workaround / fix:** Re-read the file and build oldString from the file's literal content (plain `"`, not `\"`).
 - **Prevent next time:** When the oldString spans a docstring, verify quote escaping against the actual file bytes before replacing — or split the replacement to avoid the quoted span entirely.
 - **Also noted:** the `code-searcher` agent returned no output once when spawned with a malformed params object (missing `searchQueries`); re-spawning with the full params object fixed it. And a first validation basher failed with "command not found" for ruff/mypy/python because it didn't source `.venv/bin/activate` — the environment block in `system/environments.md` already records that the tools live in `.venv`, so sourcing the venv first is the standing fix.
+
+---
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 13)
+- **Problem:** Exact-string edits to the new parameter-tampering test/probe briefly produced a syntax collision and stale fixture assumptions; URL query encoding also hid the injected sentinel from the test callback.
+- **Cost:** Several focused reruns and one final full-suite rerun.
+- **Cause:** The mutation helper correctly percent-encodes the sentinel, while the test callback initially searched the raw URL; one replacement joined a declaration and loop on the same line.
+- **Workaround / fix:** Re-read the actual file, used URL decoding in the injected test request, added a default-sentinel regression, and reran Ruff, strict mypy, full pytest, and `git diff --check`.
+- **Prevent next time:** When testing URL mutations, inspect decoded query values rather than raw serialized URLs; after chained exact replacements, run syntax/lint immediately before broader tests.

@@ -205,3 +205,14 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - **Code aligned 2026-08-02 (Session 12).** `SecurityFinding.impact` / `remediation` / `verification_status` / `affected` / `evidence_ids` are optional; `run_checks` still populates them when a check defines them, and the Markdown/SARIF renderers emit whatever a finding carries and skip the rest.
   - The `user/preferences.md` "disclosure must be evidence-backed" bullet is updated in place to match (current-state file, provenance refreshed).
   - Future agents MUST NOT re-mandate the full schema without a superseding ADR.
+
+---
+## ADR-18: Bypass detection is bounded, evidence-first, and caller-driven (2026-08-02)
+- **Status:** accepted
+- **Context:** The user requested methods to detect captive-portal bypass potential: CONNECT, DNS tunnel, click-through, port scan, and parameter tampering. Existing PortalLens architecture is passive by default, uses one `AcquisitionPolicy.authorized` flag for active work, and treats `Evidence` as the source of truth for findings.
+- **Decision:** Implement the five probes in `security/bypass.py`. Every probe requires the single authorization flag, has bounded defaults, accepts injectable network seams, and returns positive, negative, or inconclusive `Evidence`. Implement report-level `detect_bypass()` and immutable `merge_bypass_evidence()` in `security/bypass_detection.py`; the passive analyzer does not invoke probes automatically. Findings use potential/provisional language, and open-port evidence is informational until protocol-level access is verified.
+- **Consequences:**
+  - Probe methods never authenticate, submit credentials, send exploit payloads, or attempt to obtain access.
+  - Callers explicitly run authorized probes and merge their evidence before rendering or persisting a report.
+  - Future CLI/investigation integration should preserve the caller-driven/passive default and record probe authorization/audit metadata.
+  - Protocol-level response markers and redirect-chain captures can improve calibration in a later iteration without changing the evidence-first boundary.

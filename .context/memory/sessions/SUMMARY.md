@@ -63,3 +63,8 @@ records.
 ---
 - **2026-08-02 — Session 12** — Buffy / deepseek-v4-flash — aligned `src/` with ADR-15/17: `AcquisitionPolicy` is one `authorized` boolean; `--i-have-authorization` + `authorize` verb + AuthorizationGrant machinery removed; `analyze`/`tui`/`investigate`/`step` share `--authorized`; `SecurityFinding` prose fields optional with renderers tolerant (ADR-17). 199 tests, ruff + mypy clean. Backlog item checked off; ADR-15/17 notes updated.
   Detail: .context/memory/sessions/2026-08-02-12/notes.md
+
+---
+- **2026-08-02 — Session 13** — Buffy / deepseek-v4-flash — shipped bounded authorized captive-portal bypass probes (CONNECT, DNS tunnel, click-through, port scan, parameter tampering), typed bypass evidence, and report-level potential-bypass findings via `detect_bypass` / `merge_bypass_evidence`. 220 tests, Ruff, mypy clean.
+  Key decision: keep probes caller-driven and passive by default; open ports remain informational prerequisite evidence, not bypass proof. Product commit c23f0e6 pushed.
+  Detail: .context/memory/reviews/2026-08-02-review.md

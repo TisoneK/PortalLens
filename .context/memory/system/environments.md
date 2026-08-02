@@ -35,7 +35,7 @@ block (and its "last verified" date) every time you run on it again.
   - System Python may be `externally-managed` — always use a `.venv` for project installs
 
 ---
-## Tisone's macOS workstation (last verified 2026-08-01)
+## Tisone's macOS workstation (last verified 2026-08-02)
 - **Identify by:** repo at `/Users/bao/Code/PortalLens`, Darwin 24.6.0 (macOS 15), local IDE agent (Claude Code), user's own git credentials
 - **OS:** macOS 15 (Darwin 24.6.0), arm64
 - **Runtimes:** system `python3` is **3.9.6** — below this project's `requires-python = ">=3.10"`, so it cannot run PortalLens. Use `/Users/bao/.local/bin/python3.12` (3.12.13). `uv` is also installed at `/Users/bao/.local/bin/uv`. No pyenv, no Homebrew Python on PATH.
@@ -52,6 +52,7 @@ block (and its "last verified" date) every time you run on it again.
 - **Quirks:**
   - **Reach for `python3.12`, never bare `python3`** — the bare one is 3.9 and will fail on this project's syntax and typing.
   - `.venv/` is gitignored; a fresh clone needs the venv step above before anything runs.
+  - Session 13 verified `.venv/bin/ruff check src/portallens tests`, `.venv/bin/mypy src/portallens`, `.venv/bin/pytest -q` (220 passed), and `git diff --check`.
   - `git worktree add <path> <sha>` works and is a clean way to render "before" output for a refactor diff. Remove it with `git worktree remove <path>` when done.
 
 ---
