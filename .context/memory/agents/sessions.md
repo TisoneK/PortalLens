@@ -191,3 +191,12 @@ past entries — append corrections instead.
 - **Outcome:** done — added injectable shell-free command execution with bounded, interruptible cancellation; Windows `netsh`, macOS `airport`/`networksetup`, and Linux `nmcli` adapters; normalized parsers and 11 fixture-driven tests. Final suite: 256 passed; Ruff and strict mypy clean across 42 source files.
 - **Open items:** Wi-Fi TUI picker/live orchestration, captive-portal probe profiles, and live-event persistence remain in the backlog.
 - **Report:** `.context/memory/reviews/2026-08-02-wifi-adapters-review.md`; notes: `.context/memory/sessions/2026-08-02-18/notes.md`
+
+---
+## 2026-08-02 — Session 19
+- **Agent:** Buffy | **Model:** deepseek-v4-flash | **Platform:** Tisone's macOS workstation (Darwin 24.6.0 / macOS 15.7.7, local) | **Role:** engineer / feature-engineer | **Core:** 0.5.0
+- **Task:** Continue the Wi-Fi feature with a safe TUI picker/session controller over the read-only desktop adapters. Scan/rescan/cancel/select only; no association, credentials, browser launch, portal automation, or bypass execution.
+- **Commits:** 1 product pending + context pending — picker/session controller and `portallens wifi` command
+- **Outcome:** done — generation-guarded `WifiSessionController`, lazy Textual `WifiPickerApp`, `portallens wifi --platform/--interface`, escaped network labels, safe callback cleanup, and seven focused tests. Final suite: 263 passed; Ruff and strict mypy clean across 44 source files.
+- **Open items:** Captive-portal detection for selected sessions and Wi-Fi live-event persistence remain in the backlog.
+- **Report:** `.context/memory/reviews/2026-08-02-wifi-picker-review.md`; notes: `.context/memory/sessions/2026-08-02-19/notes.md`

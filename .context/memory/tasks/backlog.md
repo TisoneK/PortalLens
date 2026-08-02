@@ -100,3 +100,8 @@ don't remove the line.
 - [ ] **Wi-Fi TUI picker and live session orchestration** — next slice over the adapter boundary; keep platform commands outside `tui/`, with cancellation and session-generation guards.
 - [ ] **Captive-portal detection for live Wi-Fi sessions** — next slice after picker; use standards-aware probe profiles and bounded redirect/status evidence without browser launch or automatic bypass execution.
 - [ ] **Wi-Fi live-event persistence** — next persistence slice; append a SQLite migration for redacted scan/connection/portal/cancellation/session-switch events.
+
+---
+- [x] **Wi-Fi TUI picker and live session orchestration** — DONE 2026-08-02 (Buffy / Session 19) — added generation-guarded `WifiSessionController`, lazy Textual `WifiPickerApp`, and `portallens wifi --platform/--interface` with scan/rescan/cancel/select controls. Selection is read-only; stale worker results are discarded and callbacks detach safely.
+- [ ] **Captive-portal detection for live Wi-Fi sessions** — next slice after picker; use standards-aware probe profiles and bounded redirect/status evidence without browser launch or automatic bypass execution.
+- [ ] **Wi-Fi live-event persistence** — follow-up persistence slice; append a SQLite migration for redacted scan/connection/portal/cancellation/session-switch events.

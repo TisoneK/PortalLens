@@ -215,3 +215,11 @@ if literally nothing slowed you down.
 - **Cause:** Used a whole-file writer for an append-only context file and applied a replacement against text that had already changed.
 - **Workaround / fix:** Restored from `fb99e47`, used `cat >>` with a heredoc, verified ADR-20 remained and `git diff --numstat` showed 7 additions / 0 deletions; repaired the import separator and reran all gates.
 - **Prevent next time:** Treat append-only context files as shell-append-only. Before any append, anchor from the file tail; after appending, compare against the pre-session baseline and require zero deletions.
+
+---
+## 2026-08-02 — Buffy / Session 19
+- **Problem:** The first picker controller draft exposed two integration issues: Textual callbacks arrived before the worker was scheduled in the test harness, and the picker mutated a private controller listener. Review also found stale rows visible during rescan and a Python-3.10 `typing.Self` incompatibility.
+- **Cost:** ~20 min running focused diagnostics, checking Textual callback APIs, and tightening the controller/picker boundary before the full suite.
+- **Cause:** The initial design assumed worker callback timing and treated the presentation callback as an internal implementation detail.
+- **Workaround / fix:** Added explicit listener registration, main-thread-aware callback delivery with shutdown tolerance, public initial-state seam, stale-row clearing, generation guards, and a Python-3.10-compatible forward-reference return annotation. Full validation was rerun after each correction.
+- **Prevent next time:** Test Textual worker timing separately from pure controller timing; keep UI callback registration public and lifecycle-aware from the first draft.
