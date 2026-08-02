@@ -37,46 +37,57 @@ lazy-imported inside the `tui` subcommand only.
 
 ## Usage
 
-### Passive analysis (default — no network access)
+The full, step-by-step tutorial lives in **[`docs/TUTORIAL.md`](docs/TUTORIAL.md)** — every command with all its options, the report walkthrough, saved investigations, the library API, the authorized bypass probes, and troubleshooting. This section is the quick tour.
+
+### Quick start
 
 ```bash
-portallens "http://maz.wifi/login?dst=http%3A%2F%2Fwww.msftconnecttest.com%2Fredirect"
-```
+# Passive analysis (default — no network access)
+portallens "http://maz.wifi/login?dst=..."
 
-The CLI is a `click.Group` with two subcommands — `analyze` (prints
-Markdown) and `tui` (opens the investigation console). Passing URLs
-directly routes to `analyze`, preserving the pre-TUI invocation form:
-
-```bash
-portallens analyze "http://maz.wifi/login?dst=..."     # explicit
-portallens "http://maz.wifi/login?dst=..."             # default-subcommand fallback
-portallens tui "http://maz.wifi/login?dst=..."         # opens the TUI
-```
-
-### Passive analysis with multiple URLs
-
-If you captured both the local captive hostname AND the external portal URL the redirect landed on, pass both — the relationship analyzer uses the pair to infer `REDIRECTS_TO`, `USES_PLATFORM`, `OPERATES_NETWORK`, etc.
-
-```bash
+# Two URLs: the local captive host + the external portal it redirected to.
+# The pair lets the relationship analyzer infer REDIRECTS_TO, USES_PLATFORM,
+# OPERATES_NETWORK, etc.
 portallens \
     "http://maz.wifi/login?dst=..." \
     "https://captive.ispman.tech/hotspots/.../select?..."
+
+# Same analysis, opened in the interactive investigation console
+# (needs the [tui] extra)
+portallens tui "http://maz.wifi/login?dst=..."
+
+# Persist, list, re-render, and extend an investigation
+portallens investigate "http://maz.wifi/login?dst=..."
+portallens investigations
+portallens show <id>
+portallens step <id> resolve_dns
 ```
 
-### Investigation-console TUI (ADR-7)
+### Command surface
+
+| Command | What it does |
+|---|---|
+| `portallens <urls>...` | Shortcut for `analyze` — passive analysis, Markdown report on stdout |
+| `portallens analyze <urls>...` | Explicit analysis; add `--format sarif`, `-o <file>`, `--notes` |
+| `portallens tui <urls>...` | Same analysis, opened in the interactive console (TUI) |
+| `portallens investigate <urls>...` | Analyze and save as a persisted investigation |
+| `portallens investigations` | List saved investigations, newest first |
+| `portallens show <id> [--audit]` | Re-render a saved report (or its audit trail) |
+| `portallens step <id> <slug>` | Run one analysis step against a saved investigation (`resolve_dns`, `ip_asn_lookup`) |
+
+### Passive by default — active only with `--authorized`
+
+Analysis never touches the network unless you say so. **One flag —
+`--authorized` — unlocks every active technique** (HTTP fetching, DNS
+resolution, port scanning, OSINT, bypass probes; ADR-15):
 
 ```bash
-portallens tui \
-    "http://maz.wifi/login?dst=..." \
-    "https://captive.ispman.tech/hotspots/.../select?..."
+portallens --authorized "https://example.com/login"
 ```
 
-The TUI is a pure presentation layer — it renders a `PortalReport` the
-engine already produced and contains no analysis logic. It is
-**responsive from ~40 columns (Termux, portrait) to wide desktop**: the
-relationship view stacks tree-over-detail on narrow terminals and sits
-side-by-side on wide ones. Severity and status are never colour-only —
-every confidence badge carries its label text alongside its percentage.
+You are responsible for targets you authorize. **Do not run active
+analysis against networks you do not own or have explicit written
+permission to assess.**
 
 ### Library use
 
@@ -85,50 +96,21 @@ from portallens.portal import AnalysisContext
 from portallens.plugins.captive_wifi import CaptiveWifiPortal
 from portallens.reporting import render_markdown
 
-portal = CaptiveWifiPortal()
-report = portal.analyze(AnalysisContext(urls=[
+report = CaptiveWifiPortal().analyze(AnalysisContext(urls=[
     "http://maz.wifi/login?dst=...",
     "https://captive.ispman.tech/hotspots/.../select?...",
 ]))
 print(render_markdown(report))
 ```
 
-The TUI is equally usable as a library (requires the `[tui]` extra):
+### Learn more
 
-```python
-from portallens.tui import PortalLensApp
-app = PortalLensApp(report)
-app.run()
-```
-
-### Saved investigations
-
-Analysis can be persisted instead of printed. An **investigation** outlives the process — it has an id, keeps the report, and an audit log of what was done. Authorization is a single flag at invocation (ADR-15), not a per-technique record.
-
-```bash
-# Analyze and save; prints the new investigation's id
-portallens investigate "http://portal.example/login?dst=..." "https://captive.example/..."
-
-portallens investigations                 # list saved investigations, newest first
-portallens show <id>                      # render the stored report
-portallens show <id> --audit              # show the audit trail
-```
-
-The database lives at `$XDG_DATA_HOME/portallens/investigations.db` by default (override with `--db` or `$PORTALLENS_DB`). It is plain SQLite — no server, works on desktop and on a phone under Termux.
-
-### Active analysis and bypass detection (requires explicit authorization)
-
-Active techniques — HTTP fetching, DNS resolution, port scanning, OSINT lookups, and bypass probes — are gated behind an `AcquisitionPolicy` and the single `--authorized` CLI flag (ADR-15: one flag unlocks every active technique). The default policy is **passive**.
-
-```bash
-portallens --authorized "https://example.com/login"
-```
-
-The library exposes five bounded probes from `portallens.security`: `connect_test`, `dns_tunnel_test`, `click_through_test`, `port_scan_test`, and `parameter_tampering_test`. Each returns `Evidence` records, including negative or inconclusive results. Inject a request/resolver/socket callable for controlled testing; the defaults perform only the bounded operation described by the method. Convert positive probe evidence into report findings with `detect_bypass(report)`, or immutably attach evidence and derived findings with `merge_bypass_evidence(report, evidence)`.
-
-Bypass findings mean **potential** bypass only. CONNECT success, DNS resolution, click-through, and parameter mutation results require independent verification; an open port is informational prerequisite evidence, not proof that unauthenticated application traffic works. No probe submits credentials, authenticates, or attempts to obtain access.
-
-**Do not run active analysis against networks you do not own or have explicit written permission to assess.**
+The **[full tutorial → `docs/TUTORIAL.md`](docs/TUTORIAL.md)** covers
+each command with its options, how to read a report (confidence model,
+facts vs. inferences vs. hypotheses), the TUI, saved investigations and
+analysis steps, the five authorized bypass probes (`connect_test`,
+`dns_tunnel_test`, `click_through_test`, `port_scan_test`,
+`parameter_tampering_test`), SARIF output, and troubleshooting.
 
 ## Architecture
 
