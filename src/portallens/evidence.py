@@ -39,6 +39,11 @@ class EvidenceType(str, Enum):
     TLS_CERTIFICATE = "tls_certificate"     # a TLS certificate SAN / issuer / subject field
     IP_ASN = "ip_asn"                       # IP ownership / ASN data
     SERVICE_REACHABLE = "service_reachable"  # a service was reachable at host:port during authorized probing
+    BYPASS_CONNECT = "bypass_connect"       # an HTTP CONNECT tunnel was allowed or blocked
+    BYPASS_DNS = "bypass_dns"               # a DNS query resolved or was blocked
+    BYPASS_CLICK_THROUGH = "bypass_click_through"  # a request reached the intended site or portal
+    BYPASS_PORT = "bypass_port"             # a bounded port check was open or closed
+    BYPASS_PARAMETER = "bypass_parameter"   # a navigation-parameter mutation was allowed or blocked
     USER_SUPPLIED = "user_supplied"         # the user pasted this in directly
 
 

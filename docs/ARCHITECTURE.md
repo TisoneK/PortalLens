@@ -2,7 +2,7 @@
 
 ## Goals
 
-1. **Passive by default.** PortalLens works purely from URLs and user-supplied payloads. Active probing (HTTP fetches, DNS lookups, port scans) requires explicit opt-in AND authorization.
+1. **Passive by default.** PortalLens works purely from URLs and user-supplied payloads. Active probing (HTTP fetches, DNS lookups, port scans, or bypass probes) requires explicit opt-in AND authorization.
 2. **Evidence-backed.** Every inference cites the evidence it rests on. Every gap is surfaced as an open question. Hypotheses are labelled as such, with confidence capped at `low`.
 3. **Plugin-based.** The core abstraction is `Portal`. Captive Wi-Fi is the first plugin; web auth, payment, ISP portals slot in without an architectural rewrite.
 4. **Calibrated confidence.** A 60% claim means "likely, with specific evidence" — not "the model felt 60% confident." The rubric is documented; the score combination rule (noisy-OR) is documented; both are tested.
@@ -147,6 +147,17 @@ Each is a structured **`OpenQuestion`** (ADR-9), not a bare string: `subject` (t
 
 These are the prompts for follow-up — either with more user input (HTML captures, DNS records) or an explicitly authorized active assessment.
 
+## Bypass detection
+
+Bypass detection is split into two layers so acquisition remains explicit and reports remain evidence-backed:
+
+- `portallens.security.bypass` contains five bounded probes: `connect_test`, `dns_tunnel_test`, `click_through_test`, `port_scan_test`, and `parameter_tampering_test`. Each checks the single `AcquisitionPolicy.authorized` flag, accepts injectable network functions for deterministic tests/controlled captures, and returns `Evidence` records for both positive and negative outcomes.
+- `portallens.security.bypass_detection` contains `detect_bypass(report)` and `merge_bypass_evidence(report, evidence)`. The detector only interprets positive evidence; it never performs network activity. The merge helper returns a copied `PortalReport`, preserving the original report and deduplicating findings by check slug.
+
+The probes are assess-only. CONNECT reads the proxy response without sending application data; DNS uses a bounded lookup and should use a controlled unique name; click-through performs a single GET without credentials; port scan checks a bounded explicit/default port list without payloads; parameter tampering mutates only allow-listed navigation parameters and refuses credentials, vouchers, tokens, and secrets. Positive results are potential bypass signals, not proof of unrestricted access. Open-port evidence is informational until protocol-level access is verified.
+
+Callers should run probes only with explicit target authorization, then pass their evidence through `merge_bypass_evidence` (or call `detect_bypass` directly) before rendering or persisting the report. The normal passive analyzer does not invoke these probes.
+
 ## Future surfaces
 
 The PortalLens design conversation identified three components:
@@ -154,7 +165,7 @@ The PortalLens design conversation identified three components:
 - **PortalLens** — passive portal intelligence. *(Implemented here.)*
 - **Investigation-console TUI** — interactive presentation layer. *(Implemented — see "TUI" below.)*
 - **Investigation persistence** — a durable, queryable record of each investigation. *(Implemented — see "Investigation persistence" below.)*
-- **NetAudit** — authorized active security assessment. *(Planned — separate `audit` module behind the single `AcquisitionPolicy.authorized` flag, ADR-15.)*
+- **NetAudit** — authorized active security assessment. *(Implemented — admin-port assessment in `security/audit.py`; bypass probes are a separate bounded surface in `security/bypass.py`.)*
 - **DisclosureDesk** — responsible disclosure report generation + tracking. *(Planned — extends `reporting/` with SARIF + disclosure-tracking output; builds on the investigation store below.)*
 
 The `Portal` abstraction is broad enough that NetAudit can be implemented as another plugin (`PortalType.CAPTIVE_WIFI` analyzer with active policy enabled), rather than a separate product. DisclosureDesk is a reporting concern, not an analysis concern — it lives alongside `render_markdown` in `reporting/`.

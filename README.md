@@ -15,7 +15,7 @@ PortalLens never claims something as fact unless the evidence supports it. Hypot
 
 ## Status
 
-Alpha — captive Wi-Fi passive analysis is implemented and tested against a real ISPMan URL pair. The MikroTik and ISPMan signatures are validated against that capture; the CoovaChilli, UniFi, and Meraki signatures come from vendor documentation and have not yet been checked against a captured URL, which the report says wherever one of them fires. Active security assessment is gated behind explicit authorization and is the next planned surface.
+Alpha — captive Wi-Fi passive analysis and bounded bypass detection are implemented and tested against a real ISPMan URL pair. The MikroTik and ISPMan signatures are validated against that capture; the CoovaChilli, UniFi, and Meraki signatures come from vendor documentation and have not yet been checked against a captured URL, which the report says wherever one of them fires. Active security assessment is gated behind explicit authorization.
 
 ## Install
 
@@ -116,13 +116,17 @@ portallens show <id> --audit              # show the audit trail
 
 The database lives at `$XDG_DATA_HOME/portallens/investigations.db` by default (override with `--db` or `$PORTALLENS_DB`). It is plain SQLite — no server, works on desktop and on a phone under Termux.
 
-### Active analysis (requires explicit authorization)
+### Active analysis and bypass detection (requires explicit authorization)
 
-Active techniques — HTTP fetching, DNS resolution, port scanning, OSINT lookups — are gated behind an `AcquisitionPolicy` and the single `--authorized` CLI flag (ADR-15: one flag unlocks every active technique). The default policy is **passive**.
+Active techniques — HTTP fetching, DNS resolution, port scanning, OSINT lookups, and bypass probes — are gated behind an `AcquisitionPolicy` and the single `--authorized` CLI flag (ADR-15: one flag unlocks every active technique). The default policy is **passive**.
 
 ```bash
 portallens --authorized "https://example.com/login"
 ```
+
+The library exposes five bounded probes from `portallens.security`: `connect_test`, `dns_tunnel_test`, `click_through_test`, `port_scan_test`, and `parameter_tampering_test`. Each returns `Evidence` records, including negative or inconclusive results. Inject a request/resolver/socket callable for controlled testing; the defaults perform only the bounded operation described by the method. Convert positive probe evidence into report findings with `detect_bypass(report)`, or immutably attach evidence and derived findings with `merge_bypass_evidence(report, evidence)`.
+
+Bypass findings mean **potential** bypass only. CONNECT success, DNS resolution, click-through, and parameter mutation results require independent verification; an open port is informational prerequisite evidence, not proof that unauthenticated application traffic works. No probe submits credentials, authenticates, or attempts to obtain access.
 
 **Do not run active analysis against networks you do not own or have explicit written permission to assess.**
 
@@ -140,6 +144,7 @@ PortalLens
 │   ├── evidence.py            # Evidence + Observation (fact / inference / hypothesis)
 │   ├── registry.py            # @register_portal decorator
 │   ├── acquisition/           # URL parsing (passive) + HTTP fetch (active, gated)
+│   ├── security/              # Security checks, NetAudit, bounded bypass probes
 │   ├── reporting/             # Markdown renderer (canonical output)
 │   ├── investigation/         # Investigation aggregate + SQLite store (persistence)
 │   ├── tui/                   # investigation-console TUI (optional [tui] extra)
@@ -170,7 +175,7 @@ Multiple independent evidence signals are combined via a noisy-OR rule (`score([
 ## What PortalLens does NOT do
 
 - **It does not bypass authentication.** PortalLens analyzes portal URLs passively. It never submits credentials, never tries to skip the captive-portal handshake, and never attempts to obtain free internet access.
-- **It does not actively probe networks without authorization.** Every active technique (HTTP fetch, DNS lookup, port scan, OSINT lookup) is unlocked by `AcquisitionPolicy(authorized=True)` in the library, or `--authorized` on the CLI (ADR-15). **The caller is responsible for ensuring they have authorization for the target.**
+- **It does not actively probe networks without authorization.** Every active technique (HTTP fetch, DNS lookup, port scan, OSINT lookup, or bypass probe) is unlocked by `AcquisitionPolicy(authorized=True)` in the library, or `--authorized` on the CLI (ADR-15). **The caller is responsible for ensuring they have authorization for the target.**
 - **It does not guess.** If the evidence can't distinguish a reseller from an operator using a 3rd-party platform, PortalLens says so — explicitly, as a hypothesis with `low` confidence, and lists what evidence would resolve the question.
 
 ## Responsible disclosure
