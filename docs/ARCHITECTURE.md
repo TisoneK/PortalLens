@@ -48,19 +48,16 @@ This means two independent medium signals reinforce each other (40 + 40 → 64),
 
 ### `AcquisitionPolicy`
 
-A dataclass with explicit flags for every active technique:
+ADR-15 collapsed the original per-technique flag set into one authorization boolean — every active technique (HTTP fetch, DNS resolution, TLS probe, port scan, OSINT lookup) is unlocked by the same flag:
 
 ```python
 @dataclass
 class AcquisitionPolicy:
-    fetch_urls: bool = False
-    follow_redirects: bool = False
-    resolve_dns: bool = False
-    probe_tls: bool = False
-    port_scan: bool = False
+    authorized: bool = False   # ADR-15: one flag unlocks ALL active techniques
+    extra: dict = {}
 ```
 
-The default policy is passive. Active functions in `portallens.acquisition.fetcher` call `assert_policy(policy, "fetch_urls")` before doing anything — a typo can't accidentally turn a passive scan into an active one.
+The default policy is passive. Active functions in `portallens.acquisition.fetcher` call `assert_policy(policy, "fetch_urls")` before doing anything — a typo can't accidentally turn a passive scan into an active one, and there are no per-technique flags left to mis-set.
 
 ## Plugin architecture
 
@@ -157,20 +154,19 @@ The PortalLens design conversation identified three components:
 - **PortalLens** — passive portal intelligence. *(Implemented here.)*
 - **Investigation-console TUI** — interactive presentation layer. *(Implemented — see "TUI" below.)*
 - **Investigation persistence** — a durable, queryable record of each investigation. *(Implemented — see "Investigation persistence" below.)*
-- **NetAudit** — authorized active security assessment. *(Planned — separate `audit` module behind `AcquisitionPolicy` flags.)*
+- **NetAudit** — authorized active security assessment. *(Planned — separate `audit` module behind the single `AcquisitionPolicy.authorized` flag, ADR-15.)*
 - **DisclosureDesk** — responsible disclosure report generation + tracking. *(Planned — extends `reporting/` with SARIF + disclosure-tracking output; builds on the investigation store below.)*
 
 The `Portal` abstraction is broad enough that NetAudit can be implemented as another plugin (`PortalType.CAPTIVE_WIFI` analyzer with active policy enabled), rather than a separate product. DisclosureDesk is a reporting concern, not an analysis concern — it lives alongside `render_markdown` in `reporting/`.
 
 ## Investigation persistence (ADR-8)
 
-PortalLens was stateless: URLs in, `PortalReport` out. An **`Investigation`** (`portallens.investigation`) makes analysis durable — it bundles a target, the report produced for it, a per-technique authorization record (ADR-10), and an append-only audit log, and persists them so a target can be revisited and its history kept.
+PortalLens was stateless: URLs in, `PortalReport` out. An **`Investigation`** (`portallens.investigation`) makes analysis durable — it bundles a target, the report produced for it, and an append-only audit log, and persists them so a target can be revisited and its history kept. ADR-15 removed the per-investigation authorization record: authorization is the single `AcquisitionPolicy.authorized` flag asserted at invocation, not data stored on the aggregate.
 
 ```
 Investigation
 ├── id / target / portal_type / created_at / updated_at
 ├── report            # the PortalReport — "step zero" is analyze(); steps append later (ADR-9)
-├── authorizations    # [AuthorizationGrant] — per technique, timestamped (ADR-10)
 └── audit_log         # append-only [AuditEntry] — what was done, when
 ```
 
@@ -186,13 +182,13 @@ This is deliberate, not a failure to normalize. The report's shape is still chan
 
 Schema version lives in SQLite's own `PRAGMA user_version`. Migrations are an ordered ledger (`_MIGRATIONS`) applied on connect — a fresh database and an old one both converge by running every migration past their current version. So the next schema change (e.g. promoting a `disclosure_state` column for DisclosureDesk) is an **append to the ledger**, never a rewrite. A shipped migration is never edited.
 
-### Authorization is part of the audit trail (ADR-10)
+### Authorization is the single flag (ADR-15)
 
-Authorization is asserted **per technique** and **timestamped**, and recorded in the investigation itself — not held as a single boolean at invocation. It is not a badge: you can be authorized to resolve DNS and not to port-scan. For a disclosure report, "the operator asserted authorization for DNS resolution at 14:31 before it ran" is *part of the evidence*, so it lives in the record beside the findings. The set of authorizable techniques is derived from `AcquisitionPolicy`'s boolean fields, so ADR-13's future tiers (`use_osint_apis`, `execute_scripts`) become authorizable with no edit to the investigation code.
+ADR-15 replaced the ADR-10 per-technique, timestamped grant records with a single `AcquisitionPolicy.authorized` boolean asserted at invocation (`--authorized` on the CLI). The audit log still records *what ran*, *when*, and *which step* — but there is no per-technique authorization bookkeeping stored on the investigation. The `authorize` CLI verb was removed; `analyze`, `investigate`, and `step` each take the same `--authorized` flag.
 
 ### CLI
 
-Four subcommands operate the store: `investigate` (analyze + save, prints the new id), `investigations` (list, newest first), `show <id>` (render the stored report, or `--audit` for the trail), and `authorize <id> --technique <t>` (record a timestamped grant). The database path resolves from `--db` → `$PORTALLENS_DB` → `$XDG_DATA_HOME/portallens/investigations.db`.
+Four subcommands operate the store: `investigate` (analyze + save, prints the new id), `investigations` (list, newest first), `show <id>` (render the stored report, or `--audit` for the trail), and `step <id> <slug>` (run a registered analysis step under `--authorized`). The database path resolves from `--db` → `$PORTALLENS_DB` → `$XDG_DATA_HOME/portallens/investigations.db`.
 
 ## TUI (ADR-7)
 
@@ -251,4 +247,4 @@ Two reasons:
 1. **Legal.** Active probing of networks you don't own is unauthorized scanning in most jurisdictions. PortalLens must not make it easy to do that by accident.
 2. **Calibration.** A passive analyzer's confidence scores are interpretable: "this URL signature is X% likely to be MikroTik." An active analyzer that fetches a URL adds the confound of "the URL might respond differently to a bot vs. a browser" — the calibration gets murky.
 
-Passive is the right default. Active is opt-in, per-technique, per-session, with an explicit authorization flag.
+Passive is the right default. Active is opt-in — one explicit authorization flag (ADR-15) at invocation unlocks every active technique.

@@ -10,8 +10,9 @@ The base class deliberately does not mandate how a portal acquires its
 inputs. The default :class:`AcquisitionPolicy` is **passive** — analysis
 works purely from URLs and user-supplied payloads. Active probing (HTTP
 fetches, port scans, DNS lookups beyond URL parsing) requires the caller
-to pass an ``AcquisitionPolicy`` with the relevant flags enabled, and
-the caller is responsible for having authorization for the target.
+to pass ``AcquisitionPolicy(authorized=True)`` (ADR-15 — one
+authorization unlocks all active techniques), and the caller is
+responsible for having authorization for the target.
 """
 
 from __future__ import annotations
@@ -47,14 +48,16 @@ class Severity(str, Enum):
 
 
 class SecurityFinding(BaseModel):
-    """A single security finding — the disclosure record ADR-11 mandates.
+    """A single security finding.
 
-    Every finding carries the disclosure schema from the user's preferences:
-    Title, Affected asset, Evidence, Impact, Confidence, Recommended
-    remediation, and Verification status. ``confidence`` uses the same
-    ``[0, 100]`` rubric as every other PortalLens claim; ``verification_status``
-    reflects whether the check's rule has been validated against a real
-    capture (``Provenance``) or is provisional.
+    ADR-11 defined a mandatory disclosure schema (Title, Affected asset,
+    Evidence, Impact, Confidence, Recommended remediation, Verification
+    status); ADR-17 made the prose fields **optional** — a finding may be a
+    bare ``check_slug`` + ``title`` + ``severity`` + ``confidence``. The full
+    schema is one valid shape, not the required one. ``confidence`` uses the
+    same ``[0, 100]`` rubric as every other PortalLens claim;
+    ``verification_status`` reflects whether the check's rule has been
+    validated against a real capture (``Provenance``) or is provisional.
     """
 
     check_slug: str
@@ -63,9 +66,9 @@ class SecurityFinding(BaseModel):
     confidence: int = Field(ge=0, le=100)
     affected: str | None = None
     evidence_ids: list[str] = Field(default_factory=list)
-    impact: str
-    remediation: str
-    verification_status: str
+    impact: str | None = None
+    remediation: str | None = None
+    verification_status: str | None = None
     note: str | None = None
 
 
@@ -92,39 +95,22 @@ class AcquisitionPolicy:
     """What an analyzer is allowed to do to gather evidence.
 
     Passive analysis (URL parsing, fingerprinting user-supplied HTML/HAR)
-    is always allowed. Every active technique — fetching URLs, doing DNS
-    lookups beyond the URL parser, port scanning, TLS probing — must be
-    explicitly enabled here. **The caller is responsible for ensuring
-    they have authorization for any active technique they enable.**
+    is always allowed. Every active technique — fetching URLs, following
+    redirects, DNS lookups beyond the URL parser, TLS probing, port
+    scanning, OSINT API calls — is unlocked by the single ``authorized``
+    flag (ADR-15: one authorization unlocks all active techniques).
+    **The caller is responsible for ensuring they have authorization
+    for any active technique they enable.**
     """
 
-    fetch_urls: bool = False
-    follow_redirects: bool = False
-    resolve_dns: bool = False
-    probe_tls: bool = False
-    port_scan: bool = False
-    use_osint_apis: bool = False  # ADR-13 Tier-1: third-party OSINT (CT logs, ASN/RIPEstat) — leaves the machine, does NOT touch the target
+    authorized: bool = False  # ADR-15: the single flag that unlocks ALL active techniques
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_passive(self) -> bool:
-        """True iff no active technique is enabled.
+        """True iff no active technique is enabled."""
 
-        ADR-13 note: ``use_osint_apis`` touches third parties (leaves the
-        machine) even though it never touches the target, so it is neither
-        ``is_passive`` nor target-facing-active — it is its own middle tier.
-        """
-
-        return not any(
-            (
-                self.fetch_urls,
-                self.follow_redirects,
-                self.resolve_dns,
-                self.probe_tls,
-                self.port_scan,
-                self.use_osint_apis,
-            )
-        )
+        return not self.authorized
 
 
 @dataclass

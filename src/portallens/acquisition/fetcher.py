@@ -1,8 +1,9 @@
 """Active acquisition — HTTP fetching.
 
-Only used when the caller passes ``AcquisitionPolicy(fetch_urls=True)``
-AND has authorization for the target. Passive analysis never imports
-this module, so a typo can't accidentally turn a passive scan into an
+Only used when the caller passes ``AcquisitionPolicy(authorized=True)``
+(ADR-15 — one flag unlocks every active technique) AND has
+authorization for the target. Passive analysis never imports this
+module, so a typo can't accidentally turn a passive scan into an
 active one.
 """
 
@@ -42,19 +43,18 @@ def fetch(
 ) -> FetchedDocument:
     """Fetch ``url`` with the given :class:`AcquisitionPolicy`.
 
-    Raises :class:`AcquisitionDenied` if ``policy.fetch_urls`` is False.
-    The fetch follows redirects only if ``policy.follow_redirects`` is
-    True — otherwise a 3xx response is returned as-is.
-
-    The caller is responsible for having authorization to fetch ``url``.
-    PortalLens does not — and cannot — verify that for you.
+    Raises :class:`AcquisitionDenied` if ``policy.authorized`` is False
+    (ADR-15 — one flag unlocks all active techniques, redirects
+    included). The caller is responsible for having authorization to
+    fetch ``url``. PortalLens does not — and cannot — verify that for
+    you.
     """
 
     assert_policy(policy, "fetch_urls")
     headers = {"User-Agent": user_agent}
     with httpx.Client(
         timeout=timeout_seconds,
-        follow_redirects=policy.follow_redirects,
+        follow_redirects=policy.authorized,
         max_redirects=10,
     ) as client:
         response = client.get(url, headers=headers)

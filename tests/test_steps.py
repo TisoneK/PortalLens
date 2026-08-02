@@ -1,10 +1,11 @@
 """Tests for the AnalysisStep registry (ADR-9) and its first steps.
 
 Covers: registry invariants; the computed "next investigation" queue matches
-open questions; the resolve_dns step is gated behind the policy and produces
-DNS_RECORD evidence; the ip_asn_lookup step is gated behind use_osint_apis
-and produces IP_ASN evidence; and investigation.append_evidence appends to
-the report + audit log.
+open questions; the resolve_dns step is gated behind the single
+``AcquisitionPolicy.authorized`` flag (ADR-15) and produces DNS_RECORD
+evidence; the ip_asn_lookup step resolves hostnames + queries OSINT under the
+same single flag and produces IP_ASN evidence; and
+investigation.append_evidence appends to the report + audit log.
 """
 
 from __future__ import annotations
@@ -89,7 +90,7 @@ class TestNextSteps:
 
 
 class TestResolveDnsStep:
-    def test_requires_policy(self) -> None:
+    def test_requires_authorized_policy(self) -> None:
         inv = _investigation()
         step = step_for_slug("resolve_dns")
         assert step is not None
@@ -103,28 +104,28 @@ class TestResolveDnsStep:
         inv = _investigation()
         step = step_for_slug("resolve_dns")
         assert step is not None
-        evidence = step.run(inv, AcquisitionPolicy(resolve_dns=True))
+        evidence = step.run(inv, AcquisitionPolicy(authorized=True))
         assert evidence
         assert all(ev.type is EvidenceType.DNS_RECORD for ev in evidence)
         assert all(ev.value for ev in evidence)  # resolved addresses
 
 
 class TestIpAsnStep:
-    def test_requires_osint_tier(self) -> None:
+    def test_requires_authorized_policy(self) -> None:
         inv = _investigation()
         step = step_for_slug("ip_asn_lookup")
         assert step is not None
-        # Not even resolve_dns enables it — ADR-13: enabling one tier never
-        # implies another.
+        # ADR-15: one flag unlocks every active technique — a passive policy
+        # forbids the OSINT lookup regardless of technique.
         with pytest.raises(AcquisitionDenied):
-            step.run(inv, AcquisitionPolicy(resolve_dns=True))
+            step.run(inv, AcquisitionPolicy())
 
-    def test_osint_consent_never_implies_dns_resolution(
+    def test_resolves_hostnames_and_queries_osint_under_the_single_flag(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # ADR-13: use_osint_apis is Tier-1 (leaves the machine, never touches
-        # the target). Resolving the target's hostname is resolve_dns work and
-        # must NOT run under OSINT consent alone — hostnames are skipped.
+        # ADR-15 replaced ADR-13's tiers: with the single authorized flag set,
+        # the step resolves the target's hostnames (DNS) and looks them up
+        # (OSINT) — no separate DNS consent is needed.
         from portallens.steps import dns as dns_mod
         from portallens.steps import ip_asn as ip_asn_mod
 
@@ -140,14 +141,8 @@ class TestIpAsnStep:
         step = step_for_slug("ip_asn_lookup")
         assert step is not None
 
-        # OSINT-only consent: the fixture's hostnames are skipped, no DNS runs.
-        evidence = step.run(inv, AcquisitionPolicy(use_osint_apis=True))
-        assert called == []
-        assert evidence == []
-
-        # With resolve_dns consent too, the hostname is resolved then looked up.
-        evidence = step.run(inv, AcquisitionPolicy(use_osint_apis=True, resolve_dns=True))
-        assert called, "DNS fallback must run when resolve_dns is authorized"
+        evidence = step.run(inv, AcquisitionPolicy(authorized=True))
+        assert called, "hostnames must be resolved then looked up under the single flag"
         assert evidence
         assert all(ev.type is EvidenceType.IP_ASN for ev in evidence)
 
@@ -160,7 +155,7 @@ class TestIpAsnStep:
         inv = _investigation()
         step = step_for_slug("ip_asn_lookup")
         assert step is not None
-        evidence = step.run(inv, AcquisitionPolicy(use_osint_apis=True, resolve_dns=True))
+        evidence = step.run(inv, AcquisitionPolicy(authorized=True))
         assert evidence
         assert all(ev.type is EvidenceType.IP_ASN for ev in evidence)
 

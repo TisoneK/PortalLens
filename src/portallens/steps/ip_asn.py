@@ -1,15 +1,12 @@
-"""IP/ASN lookup step (ADR-9, ADR-13 Tier-1 OSINT) — closes "who is upstream?"
+"""IP/ASN lookup step (ADR-9) — closes "who is upstream?"
 
 Queries RIPEstat (a third-party OSINT API) for the ASN and holder of an IP
 and records them as :class:`~portallens.evidence.EvidenceType.IP_ASN`
-evidence. Gated behind ``AcquisitionPolicy.use_osint_apis`` (ADR-13): it
-leaves the machine but never touches the target — it is neither passive nor
-target-facing-active, it is its own middle tier.
-
-The DNS fallback (resolving a hostname to an IP so it can be looked up) is
-**not** implied by OSINT consent (ADR-13: enabling one tier never implies
-another). It only runs when the policy also enables ``resolve_dns`` —
-otherwise hostnames are skipped and only IP literals are looked up.
+evidence. Gated behind the single ``AcquisitionPolicy.authorized`` flag
+(ADR-15): when set, the step resolves hostnames to IPs (via the
+:mod:`portallens.steps.dns` resolver) and looks each one up. Under ADR-13
+this was its own consent tier with a DNS fallback that needed separate
+consent; ADR-15 removed the tier system entirely.
 
 The HTTP client is injectable so tests exercise the parsing without the
 network. The default uses ``httpx`` (already a dependency).
@@ -76,10 +73,9 @@ def whois_for_ip(ip: str, *, client: Any | None = None) -> list[tuple[str, str]]
 def run_ip_asn_lookup(investigation: Investigation, policy: AcquisitionPolicy) -> list[Evidence]:
     """Look up ASN / org for each observed host, resolving DNS first if needed.
 
-    Hostnames are skipped (not silently resolved) unless ``resolve_dns`` is
-    also authorized — ADR-13: OSINT consent never implies DNS consent. The
-    return value is the evidence only; the CLI surfaces skipped hosts to the
-    user via :func:`dnsless_hostnames`.
+    With the single ``authorized`` flag set (ADR-15), hostnames are resolved
+    via the DNS resolver and then looked up; IP literals are looked up
+    directly.
     """
 
     from portallens.steps.dns import resolve_host
@@ -88,12 +84,7 @@ def run_ip_asn_lookup(investigation: Investigation, policy: AcquisitionPolicy) -
     assert_policy(policy, "use_osint_apis")
     evidence: list[Evidence] = []
     for host in hosts_from_report(investigation.report):
-        if is_ip(host):
-            ips = [host]
-        elif policy.resolve_dns:
-            ips = resolve_host(host)
-        else:
-            continue
+        ips = [host] if is_ip(host) else resolve_host(host)
         for ip in ips:
             for key, value in whois_for_ip(ip):
                 evidence.append(
@@ -106,22 +97,6 @@ def run_ip_asn_lookup(investigation: Investigation, policy: AcquisitionPolicy) -
                     )
                 )
     return evidence
-
-
-def dnsless_hostnames(investigation: Investigation, policy: AcquisitionPolicy) -> list[str]:
-    """Hostnames the step would skip for lack of ``resolve_dns`` consent.
-
-    Lets the CLI explain *why* a step produced nothing for a hostname-based
-    investigation: OSINT consent (ADR-13 Tier-1) never implies DNS consent,
-    so ``captive.ispman.tech`` can't be resolved-and-looked-up by a user who
-    authorized only OSINT.
-    """
-
-    from portallens.steps.registry import hosts_from_report
-
-    if policy.resolve_dns:
-        return []
-    return [host for host in hosts_from_report(investigation.report) if not is_ip(host)]
 
 
 register_step(

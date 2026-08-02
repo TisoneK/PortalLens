@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from portallens.steps import dns as _dns  # noqa: F401 — registers resolve_dns
 from portallens.steps import ip_asn as _ip_asn  # noqa: F401 — registers ip_asn_lookup
-from portallens.steps.ip_asn import dnsless_hostnames
 from portallens.steps.registry import (
     AnalysisStep,
     compute_next_steps,
@@ -23,7 +22,6 @@ from portallens.steps.registry import (
 __all__ = [
     "AnalysisStep",
     "compute_next_steps",
-    "dnsless_hostnames",
     "hosts_from_report",
     "refine_open_questions",
     "register_step",

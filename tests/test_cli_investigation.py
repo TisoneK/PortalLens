@@ -63,32 +63,16 @@ class TestShowCommand:
         assert result.exit_code == 1
 
 
-class TestAuthorizeCommand:
-    def test_records_authorization(self, tmp_path: Path) -> None:
-        db = tmp_path / "db.sqlite"
+class TestAuthorizeVerbRemoved:
+    """ADR-15 removed the `authorize` verb — the single `--authorized` flag
+    on `investigate`/`analyze`/`step` is the one authorization gate."""
+
+    def test_authorize_is_not_a_subcommand(self) -> None:
         runner = CliRunner()
-        inv_id = _investigate(runner, db)
-        result = runner.invoke(
-            main, ["authorize", "--db", str(db), inv_id, "--technique", "resolve_dns", "--note", "ok"]
-        )
+        result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
-        # It shows up in the audit trail from a later invocation.
-        audit = runner.invoke(main, ["show", "--db", str(db), inv_id, "--audit"])
-        assert "resolve_dns" in audit.output
-
-    def test_unknown_technique_exits_2(self, tmp_path: Path) -> None:
-        db = tmp_path / "db.sqlite"
-        runner = CliRunner()
-        inv_id = _investigate(runner, db)
-        result = runner.invoke(main, ["authorize", "--db", str(db), inv_id, "--technique", "nonsense"])
-        assert result.exit_code == 2
-        assert "unknown active technique" in result.output
-
-    def test_missing_id_exits_1(self, tmp_path: Path) -> None:
-        result = CliRunner().invoke(
-            main, ["authorize", "--db", str(tmp_path / "db.sqlite"), "nope", "--technique", "resolve_dns"]
-        )
-        assert result.exit_code == 1
+        # The group help lists every subcommand — `authorize` must not be one.
+        assert "authorize" not in result.output
 
 
 class TestEmptyListing:
@@ -99,8 +83,8 @@ class TestEmptyListing:
 
 
 class TestStepCommand:
-    """The `portallens step <id> <slug>` verb (ADR-9): load -> check
-    authorization -> run -> append evidence -> save."""
+    """The `portallens step <id> <slug>` verb (ADR-9): load -> run (under
+    the single `--authorized` flag, ADR-15) -> append evidence -> save."""
 
     def test_unknown_step_exits_2(self, tmp_path: Path) -> None:
         db = tmp_path / "db.sqlite"
@@ -114,13 +98,16 @@ class TestStepCommand:
         result = CliRunner().invoke(main, ["step", "--db", str(tmp_path / "db.sqlite"), "nope", "resolve_dns"])
         assert result.exit_code == 1
 
-    def test_requires_authorization_exits_2(self, tmp_path: Path) -> None:
+    def test_active_step_without_flag_exits_2(self, tmp_path: Path) -> None:
+        # ADR-15: an active step run without `--authorized` is refused — the
+        # step's own assert_policy raises AcquisitionDenied, surfaced as a
+        # clean exit 2, not a traceback.
         db = tmp_path / "db.sqlite"
         runner = CliRunner()
         inv_id = _investigate(runner, db)
         result = runner.invoke(main, ["step", "--db", str(db), inv_id, "resolve_dns"])
         assert result.exit_code == 2
-        assert "requires authorization" in result.output
+        assert "authorized" in result.output
 
     def test_runs_authorized_step_and_saves(self, tmp_path: Path, monkeypatch) -> None:
         from portallens.steps import dns as dns_mod
@@ -129,22 +116,12 @@ class TestStepCommand:
         db = tmp_path / "db.sqlite"
         runner = CliRunner()
         inv_id = _investigate(runner, db)
-        runner.invoke(main, ["authorize", "--db", str(db), inv_id, "--technique", "resolve_dns"])
-        result = runner.invoke(main, ["step", "--db", str(db), inv_id, "resolve_dns"])
+        result = runner.invoke(main, ["step", "--db", str(db), inv_id, "resolve_dns", "--authorized"])
         assert result.exit_code == 0, result.output
         assert "produced 2 evidence record(s)" in result.output  # one per observed host
         # The evidence persists: the audit trail now records the step.
         audit = runner.invoke(main, ["show", "--db", str(db), inv_id, "--audit"])
         assert "Analysis step 'resolve_dns'" in audit.output
-
-    def test_unknown_technique_authorization_still_rejected(self, tmp_path: Path) -> None:
-        db = tmp_path / "db.sqlite"
-        runner = CliRunner()
-        inv_id = _investigate(runner, db)
-        # Authorizing an unrelated technique does not authorize resolve_dns.
-        runner.invoke(main, ["authorize", "--db", str(db), inv_id, "--technique", "port_scan"])
-        result = runner.invoke(main, ["step", "--db", str(db), inv_id, "resolve_dns"])
-        assert result.exit_code == 2
 
     def test_thread_loop_closes_the_upstream_question(self, tmp_path: Path, monkeypatch) -> None:
         """ADR-9 loop closure end-to-end: resolve_dns + ip_asn_lookup answer
@@ -163,15 +140,11 @@ class TestStepCommand:
         before = runner.invoke(main, ["show", "--db", str(db), inv_id])
         assert "Who is the upstream Internet bandwidth provider" in before.output
 
-        # Authorize both techniques the thread needs — each explicitly
-        # (ADR-13: enabling one never implies another).
-        runner.invoke(main, ["authorize", "--db", str(db), inv_id, "--technique", "resolve_dns"])
-        runner.invoke(main, ["authorize", "--db", str(db), inv_id, "--technique", "use_osint_apis"])
-
         # Pull the thread: resolve hostnames, then look up ASN ownership.
-        step1 = runner.invoke(main, ["step", "--db", str(db), inv_id, "resolve_dns"])
+        # ADR-15: one `--authorized` flag unlocks every active technique.
+        step1 = runner.invoke(main, ["step", "--db", str(db), inv_id, "resolve_dns", "--authorized"])
         assert step1.exit_code == 0, step1.output
-        step2 = runner.invoke(main, ["step", "--db", str(db), inv_id, "ip_asn_lookup"])
+        step2 = runner.invoke(main, ["step", "--db", str(db), inv_id, "ip_asn_lookup", "--authorized"])
         assert step2.exit_code == 0, step2.output
         assert "produced" in step2.output
 

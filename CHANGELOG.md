@@ -24,6 +24,9 @@ public-facing changelog — plain language only.
 
 ### Changed
 
+- **One authorization flag instead of per-technique consent (ADR-15).** The `AcquisitionPolicy`'s six per-technique flags (fetch, follow redirects, DNS, TLS probe, port scan, OSINT) collapsed into a single `authorized` boolean, and the CLI's `--i-have-authorization` ceremony plus the `portallens authorize <id> --technique <t>` verb are gone. Every active surface — `analyze`, `investigate`, `step` — now uses the same `--authorized` flag: one assertion unlocks all active techniques. Passive remains the default.
+- **Findings can be lightweight (ADR-17).** A security finding no longer must carry the full disclosure schema (Title, Affected asset, Evidence, Impact, Confidence, Remediation, Verification status). Impact, remediation, verification status, and evidence citations are now optional — the Markdown and SARIF renderers emit whatever a finding carries and skip the rest.
+- **`portallens step <id> <slug>` no longer checks a recorded per-technique grant.** It runs under the single `--authorized` flag; an active step invoked without it is refused cleanly. The ip_asn step no longer skips hostnames for lack of separate DNS consent — one flag covers resolving and lookup.
 - **PortalLens is no longer built around a single portal provider.** Everything it knows about a platform — how to spot it, and how much each clue is worth — now lives in one place, so recognising a new provider is a matter of describing it rather than rewriting the analyzer. Reports on the portals PortalLens already understood are unchanged.
 - **Reports say when a platform's description hasn't been checked in the real world.** Some descriptions come from a vendor's own documentation and have never been matched against a portal actually captured in the wild. Where that's the case, the report now says so and invites you to treat the match as provisional.
 - **Two relationships were being listed twice** in every report that involved a hosted portal platform. Each is now listed once.
@@ -34,7 +37,7 @@ public-facing changelog — plain language only.
 - **Platform fingerprints** for MikroTik RouterOS hotspots, ISPMan captive portals, and CoovaChilli — each with confidence scores.
 - **Relationship inference** — REDIRECTS_TO, USES_PLATFORM, AUTHENTICATES_FOR, OPERATES_NETWORK, and a deliberately low-confidence RESELLS_BANDWIDTH hypothesis. Every relationship cites the evidence it rests on.
 - **Confidence model** — every non-fact statement carries an integer score in `[0, 100]` plus a label (very_low / low / medium / high / very_high). Multiple evidence signals combine via a documented noisy-OR rule.
-- **Passive by default.** No network access without explicit opt-in. Active techniques (HTTP fetch, DNS resolve, port scan) are gated behind an `AcquisitionPolicy` and require explicit `--i-have-authorization` on the CLI.
+- **Passive by default.** No network access without explicit opt-in. Active techniques (HTTP fetch, DNS resolve, port scan) are gated behind an `AcquisitionPolicy` and require explicit `--authorized` on the CLI (ADR-15, superseding the original per-technique `--i-have-authorization` ceremony).
 - **CLI** — `portallens <url> [<url> ...]` produces a Markdown report on stdout.
 - **Library API** — `CaptiveWifiPortal().analyze(AnalysisContext(urls=[...]))` returns a `PortalReport` you can render, serialize, or inspect.
 - **Plugin architecture** — the `Portal` base abstraction is broad enough that future portal types (web auth, payment, ISP) can be added as new plugins without rewriting the core.

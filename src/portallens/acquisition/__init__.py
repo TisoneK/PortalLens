@@ -20,7 +20,8 @@ from portallens.portal import AcquisitionPolicy
 class AcquisitionDenied(Exception):
     """Raised when an active technique is requested but the policy
     doesn't allow it. Callers should treat this as a hard stop, not a
-    retry — the user explicitly did not authorize the technique."""
+    retry — the caller did not enable the single ``authorized`` flag
+    (ADR-15)."""
 
 
 @dataclass(frozen=True)
@@ -82,15 +83,16 @@ def parse_portal_url(url: str) -> ParsedPortalURL:
 def assert_policy(policy: AcquisitionPolicy, technique: str) -> None:
     """Gate an active technique against the policy.
 
-    ``technique`` is the name of the :class:`AcquisitionPolicy` field
-    the technique corresponds to (``"fetch_urls"``, ``"resolve_dns"``,
-    etc.). Raises :class:`AcquisitionDenied` if the policy does not
-    enable it.
+    ``technique`` names the active technique for the error message
+    (``"fetch_urls"``, ``"resolve_dns"``, …); ADR-15 collapsed the
+    per-technique flags into one ``authorized`` boolean, so the check is
+    simply whether that single flag is set. Raises
+    :class:`AcquisitionDenied` if it is not.
     """
 
-    if not getattr(policy, technique, False):
+    if not policy.authorized:
         raise AcquisitionDenied(
             f"technique {technique!r} is not enabled by the current AcquisitionPolicy. "
-            f"Pass AcquisitionPolicy({technique}=True) — and ensure you have "
+            f"Pass AcquisitionPolicy(authorized=True) — and ensure you have "
             f"authorization for the target before doing so."
         )

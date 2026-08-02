@@ -1,6 +1,7 @@
 """Tests for NetAudit — the authorized active-assessment pass (ADR-12).
 
-Covers: admin-port probing is gated behind port_scan; the probe produces
+Covers: admin-port probing is gated behind the single
+``AcquisitionPolicy.authorized`` flag (ADR-15); the probe produces
 SERVICE_REACHABLE evidence; the gateway_admin_exposed check fires on probe
 evidence; run_netaudit re-runs checks on probe evidence; and the analyzer
 open-question suppression kicks in once probe evidence exists.
@@ -19,7 +20,7 @@ from tests.data import ISPMAN_URL, MAZ_URL
 
 
 class TestProbeAdminPorts:
-    def test_requires_port_scan_policy(self) -> None:
+    def test_requires_authorized_policy(self) -> None:
         with pytest.raises(AcquisitionDenied):
             probe_admin_ports(["maz.wifi"], AcquisitionPolicy())
 
@@ -27,7 +28,7 @@ class TestProbeAdminPorts:
         def fake_probe(host: str, port: int) -> bool:
             return port == 8291
 
-        evidence = probe_admin_ports(["maz.wifi"], AcquisitionPolicy(port_scan=True), probe_port=fake_probe)
+        evidence = probe_admin_ports(["maz.wifi"], AcquisitionPolicy(authorized=True), probe_port=fake_probe)
         assert evidence
         assert all(ev.type is EvidenceType.SERVICE_REACHABLE for ev in evidence)
         assert any(ev.key == "admin_port:8291" for ev in evidence)
@@ -35,7 +36,7 @@ class TestProbeAdminPorts:
 
     def test_unreachable_ports_produce_nothing(self) -> None:
         evidence = probe_admin_ports(
-            ["maz.wifi"], AcquisitionPolicy(port_scan=True), probe_port=lambda h, p: False
+            ["maz.wifi"], AcquisitionPolicy(authorized=True), probe_port=lambda h, p: False
         )
         assert evidence == []
 
@@ -57,7 +58,7 @@ class TestRunNetAudit:
     def test_probe_evidence_feeds_checks(self) -> None:
         result = run_netaudit(
             ["maz.wifi"],
-            AcquisitionPolicy(port_scan=True),
+            AcquisitionPolicy(authorized=True),
             probe_port=lambda h, p: p in ADMIN_PORTS,
         )
         assert result.evidence

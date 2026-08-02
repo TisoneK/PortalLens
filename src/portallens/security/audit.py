@@ -1,18 +1,20 @@
 """NetAudit — authorized active security assessment (backlogged, ADR-12).
 
-NetAudit runs **only** when the caller enables the relevant
-``AcquisitionPolicy`` technique AND has authorization for the target. It
-probes for evidence the passive analyzer cannot reach — a reachable admin
-port, an exposed admin path — records it as :class:`Evidence` records, and
-re-runs the SecurityCheck registry over the enriched evidence so the
-``gateway_admin_exposed`` check can fire on the probe results.
+NetAudit runs **only** when the caller sets the single
+``AcquisitionPolicy.authorized`` flag (ADR-15) AND has authorization for
+the target. It probes for evidence the passive analyzer cannot reach — a
+reachable admin port, an exposed admin path — records it as
+:class:`Evidence` records, and re-runs the SecurityCheck registry over the
+enriched evidence so the ``gateway_admin_exposed`` check can fire on the
+probe results.
 
 The probe function takes an injectable ``probe_port`` callable so tests can
 exercise the logic without touching the network; the default uses ``socket``.
 
-**Assess, never exploit** (ADR-12): the probes only *detect* that a service
-is reachable. They never authenticate to it, never submit credentials, and
-never attempt to bypass anything.
+The probes only *detect* that a service is reachable — no exploit action
+(authenticating, submitting credentials, bypassing) is implemented (ADR-16
+lifted the assess-only ban at the records level, but nothing beyond
+detection has been built).
 """
 
 from __future__ import annotations
@@ -54,8 +56,8 @@ def probe_admin_ports(
 ) -> list[Evidence]:
     """Probe the well-known admin ports on ``hosts``.
 
-    Gated behind ``AcquisitionPolicy.port_scan`` — raises
-    :class:`AcquisitionDenied` if the policy forbids it. Returns one
+    Gated behind the single ``AcquisitionPolicy.authorized`` flag (ADR-15)
+    — raises :class:`AcquisitionDenied` if it is not set. Returns one
     ``SERVICE_REACHABLE`` evidence record per (host, port) that accepted a
     connection. The evidence key ``admin_port:<port>`` is what the
     ``gateway_admin_exposed`` check keys on.
@@ -101,7 +103,7 @@ def run_netaudit(
     """
 
     evidence: list[Evidence] = []
-    if policy.port_scan:
+    if policy.authorized:
         evidence.extend(probe_admin_ports(hosts, policy, probe_port=probe_port))
     findings = run_checks(evidence)
     return AuditResult(evidence=evidence, findings=findings)

@@ -2,8 +2,8 @@
 
 Resolves a hostname to A/AAAA records via the stdlib ``socket`` module and
 records each address as :class:`~portallens.evidence.EvidenceType.DNS_RECORD`
-evidence. Gated behind ``AcquisitionPolicy.resolve_dns``; per ADR-10 the
-step also checks the investigation's recorded authorization.
+evidence. Gated behind the single ``AcquisitionPolicy.authorized`` flag
+(ADR-15).
 """
 
 from __future__ import annotations

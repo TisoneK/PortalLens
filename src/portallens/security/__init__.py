@@ -3,10 +3,12 @@
 - :mod:`portallens.security.checks` — the SecurityCheck registry: security
   checks as data, keyed on the evidence they require, never on the vendor.
 - :mod:`portallens.security.audit` — NetAudit: authorized active assessment
-  (admin-port probing) gated behind ``AcquisitionPolicy`` flags.
+  (admin-port probing) gated behind the single ``AcquisitionPolicy.authorized``
+  flag (ADR-15).
 
-Every finding carries the disclosure schema: Title, Affected asset,
-Evidence, Impact, Confidence, Recommended remediation, Verification status.
+Findings may be lightweight (ADR-17): check, title, severity, and confidence
+are required; Impact, Affected asset, Evidence, Remediation, and Verification
+status are included when present.
 """
 
 from __future__ import annotations

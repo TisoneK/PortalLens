@@ -2,25 +2,26 @@
 
 Until now PortalLens was stateless: URLs in, :class:`~portallens.portal.PortalReport`
 out. ADR-8 introduces the :class:`Investigation` — a durable record of a target,
-the report produced for it, the authorizations the operator has asserted, and an
-append-only audit log of everything that happened. It is the shared foundation
-the TUI and the future DisclosureDesk both build on.
+the report produced for it, and an append-only audit log of everything that
+happened. It is the shared foundation the TUI and the future DisclosureDesk
+both build on.
 
-An investigation carries three things a bare report does not:
+An investigation carries two things a bare report does not:
 
 - **Identity and time** — a stable id, and created/updated timestamps, so the
   same target can be revisited and its history kept.
-- **An authorization record** (ADR-10) — which active techniques the operator
-  asserted authorization for, each stamped with the moment it was asserted.
-  This is not a boolean badge: you can be authorized to resolve DNS and not to
-  port-scan. For a disclosure report, "I asserted authorization for DNS at
-  14:31 before running it" is itself evidence, so it lives in the record.
 - **An audit log** — an append-only trail of what was done and when. It is what
   makes a finding defensible weeks later.
 
 The report is still the immutable snapshot; the investigation is the mutable,
 persisted aggregate that owns it. ``analyze()`` is "step zero" — the passive
-bootstrap that seeds the report. Later analysis steps (ADR-9) will append to it.
+bootstrap that seeds the report. Later analysis steps (ADR-9) append to it.
+
+Authorization is **not** recorded here anymore: ADR-15 collapsed the
+per-technique consent model (ADR-10/13) into a single ``authorized`` flag on
+:class:`~portallens.portal.AcquisitionPolicy`, so there is no per-investigation
+authorization record to keep. The operator's responsibility for the target is
+unchanged — it just lives in the policy, not in the investigation.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 from portallens.evidence import Evidence
-from portallens.portal import AcquisitionPolicy, PortalReport, PortalType
+from portallens.portal import PortalReport, PortalType
 
 
 def _utcnow() -> datetime:
@@ -43,37 +44,6 @@ def _utcnow() -> datetime:
     """
 
     return datetime.now(timezone.utc)
-
-
-def _active_techniques() -> frozenset[str]:
-    """The set of active-technique names an authorization can name.
-
-    Derived from :class:`AcquisitionPolicy`'s boolean fields rather than
-    hardcoded, so when ADR-13 adds ``use_osint_apis`` / ``execute_scripts``
-    they become valid authorization targets automatically — no edit here.
-    """
-
-    probe = AcquisitionPolicy()
-    return frozenset(name for name, value in vars(probe).items() if isinstance(value, bool))
-
-
-#: Active techniques an :class:`AuthorizationGrant` may name. Kept in sync with
-#: :class:`AcquisitionPolicy` automatically (see :func:`_active_techniques`).
-ACTIVE_TECHNIQUES: frozenset[str] = _active_techniques()
-
-
-class AuthorizationGrant(BaseModel):
-    """An assertion, by the operator, that they are authorized to run one
-    active technique against this investigation's target.
-
-    Per ADR-10 this is per-technique and timestamped. The library cannot
-    verify the assertion — it records who claimed what, and when, so the
-    claim travels with the finding.
-    """
-
-    technique: str
-    granted_at: datetime = Field(default_factory=_utcnow)
-    note: str | None = None
 
 
 class AuditEntry(BaseModel):
@@ -98,7 +68,6 @@ class Investigation(BaseModel):
     report: PortalReport
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
-    authorizations: list[AuthorizationGrant] = Field(default_factory=list)
     audit_log: list[AuditEntry] = Field(default_factory=list)
     user_notes: str | None = None
 
@@ -136,7 +105,7 @@ class Investigation(BaseModel):
         return inv
 
     # ------------------------------------------------------------------
-    # Audit + authorization
+    # Audit
     # ------------------------------------------------------------------
 
     def append_evidence(self, evidence: list[Evidence], *, step: str) -> None:
@@ -163,34 +132,6 @@ class Investigation(BaseModel):
         self.audit_log.append(entry)
         self.updated_at = entry.at
         return entry
-
-    def authorize(self, technique: str, *, note: str | None = None) -> AuthorizationGrant:
-        """Record that the operator asserts authorization for ``technique``.
-
-        Raises :class:`ValueError` if ``technique`` is not a recognized active
-        technique. Re-authorizing an already-authorized technique is allowed
-        and appends a fresh, separately-timestamped grant — the audit trail
-        keeps every assertion rather than collapsing them.
-        """
-
-        if technique not in ACTIVE_TECHNIQUES:
-            known = ", ".join(sorted(ACTIVE_TECHNIQUES))
-            raise ValueError(f"unknown active technique {technique!r}; known techniques: {known}")
-        grant = AuthorizationGrant(technique=technique, note=note)
-        self.authorizations.append(grant)
-        self.record("authorized", f"Authorization asserted for {technique!r}" + (f": {note}" if note else "."))
-        return grant
-
-    def is_authorized(self, technique: str) -> bool:
-        """True iff at least one authorization grant names ``technique``."""
-
-        return any(g.technique == technique for g in self.authorizations)
-
-    @property
-    def authorized_techniques(self) -> set[str]:
-        """The distinct set of techniques the operator has authorized."""
-
-        return {g.technique for g in self.authorizations}
 
 
 def _make_id(target: str) -> str:

@@ -128,14 +128,16 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
             )
         lines.append("")
 
-    # Security findings — the disclosure records (ADR-11)
+    # Security findings — the disclosure records (ADR-11). ADR-17 made the
+    # prose fields optional: the renderer emits whatever the finding carries
+    # and skips what it doesn't.
     if report.findings:
         lines.append("## Security Findings")
         lines.append("")
         lines.append(
-            "_Every finding carries the disclosure schema: Title, Affected "
-            "asset, Evidence, Impact, Confidence, Recommended remediation, "
-            "and Verification status._"
+            "_Findings may be lightweight: check, title, severity, and "
+            "confidence are required; Impact, Remediation, Verification "
+            "status, and evidence citations are included when present._"
         )
         lines.append("")
         for f in sorted(report.findings, key=lambda f: -f.confidence):
@@ -149,9 +151,12 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
                 lines.append(f"  - Affected asset: `{f.affected}`")
             if f.evidence_ids:
                 lines.append(f"  - Evidence: {', '.join(f.evidence_ids)}")
-            lines.append(f"  - Impact: {f.impact}")
-            lines.append(f"  - Recommended remediation: {f.remediation}")
-            lines.append(f"  - Verification status: {f.verification_status}")
+            if f.impact:
+                lines.append(f"  - Impact: {f.impact}")
+            if f.remediation:
+                lines.append(f"  - Recommended remediation: {f.remediation}")
+            if f.verification_status:
+                lines.append(f"  - Verification status: {f.verification_status}")
         lines.append("")
 
     # Open questions

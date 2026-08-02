@@ -9,7 +9,6 @@ import pytest
 
 from portallens.evidence import reset_evidence_ids
 from portallens.investigation import (
-    ACTIVE_TECHNIQUES,
     MEMORY,
     SCHEMA_VERSION,
     Investigation,
@@ -57,46 +56,16 @@ class TestInvestigationModel:
     def test_ids_are_unique_across_revisits(self) -> None:
         assert _investigation().id != _investigation().id
 
-    def test_authorize_appends_grant_and_audit_entry(self) -> None:
-        inv = _investigation()
-        before = len(inv.audit_log)
-        inv.authorize("resolve_dns", note="customer confirmed")
-        assert inv.is_authorized("resolve_dns")
-        assert "resolve_dns" in inv.authorized_techniques
-        assert len(inv.audit_log) == before + 1
-        assert inv.audit_log[-1].kind == "authorized"
-
-    def test_authorize_bumps_updated_at(self) -> None:
+    def test_record_appends_audit_entry_and_bumps_updated_at(self) -> None:
+        # ADR-15 removed the per-technique authorize() machinery; the audit
+        # log is the record of what happened, and record() is how it grows.
         inv = _investigation()
         original = inv.updated_at
-        inv.authorize("fetch_urls")
+        before = len(inv.audit_log)
+        inv.record("step", "Analysis step 'resolve_dns' ran under the single authorization flag.")
+        assert len(inv.audit_log) == before + 1
+        assert inv.audit_log[-1].kind == "step"
         assert inv.updated_at >= original
-
-    def test_authorize_rejects_unknown_technique(self) -> None:
-        inv = _investigation()
-        with pytest.raises(ValueError, match="unknown active technique"):
-            inv.authorize("hack_the_gibson")
-
-    def test_reauthorizing_keeps_every_assertion(self) -> None:
-        # The audit trail must not collapse two separate assertions into one —
-        # each is separately timestamped evidence.
-        inv = _investigation()
-        inv.authorize("resolve_dns")
-        inv.authorize("resolve_dns", note="re-confirmed")
-        grants = [g for g in inv.authorizations if g.technique == "resolve_dns"]
-        assert len(grants) == 2
-
-    def test_active_techniques_tracks_acquisition_policy(self) -> None:
-        # The valid technique set is derived from AcquisitionPolicy, so it
-        # stays correct as ADR-13 adds flags. Assert the current six.
-        assert set(ACTIVE_TECHNIQUES) == {
-            "fetch_urls",
-            "follow_redirects",
-            "resolve_dns",
-            "probe_tls",
-            "port_scan",
-            "use_osint_apis",
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -136,12 +105,12 @@ class TestInvestigationStore:
         inv = _investigation()
         with InvestigationStore(db) as store:
             store.save(inv)
-            inv.authorize("resolve_dns")
+            inv.record("step", "appended evidence")
             store.save(inv)
             assert store.count() == 1
             reloaded = store.get(inv.id)
             assert reloaded is not None
-            assert reloaded.is_authorized("resolve_dns")
+            assert reloaded.audit_log[-1].detail == "appended evidence"
 
     def test_list_is_newest_first(self, tmp_path: Path) -> None:
         db = tmp_path / "db.sqlite"

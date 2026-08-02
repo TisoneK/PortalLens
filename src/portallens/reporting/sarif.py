@@ -42,29 +42,44 @@ _LEVEL_BY_SEVERITY: dict[Severity, str] = {
 def _rule_for(finding: SecurityFinding) -> dict[str, Any]:
     """One SARIF reportingDescriptor per check slug."""
 
+    properties: dict[str, Any] = {
+        "severity": finding.severity.value,
+        "confidence": finding.confidence,
+        "confidenceLabel": _label_for(finding.confidence).value,
+    }
+    if finding.verification_status:
+        properties["verificationStatus"] = finding.verification_status
     return {
         "id": finding.check_slug,
         "name": finding.check_slug,
         "shortDescription": {"text": finding.title},
-        "properties": {
-            "severity": finding.severity.value,
-            "confidence": finding.confidence,
-            "confidenceLabel": _label_for(finding.confidence).value,
-            "verificationStatus": finding.verification_status,
-        },
+        "properties": properties,
     }
 
 
 def _result_for(finding: SecurityFinding, report: PortalReport) -> dict[str, Any]:
     """One SARIF result per finding."""
 
+    # ADR-17: prose fields are optional — only set what the finding carries.
     affected = finding.affected or report.primary_url
+    markdown = f"**{finding.title}**"
+    if finding.impact:
+        markdown += f" — {finding.impact}"
+    properties: dict[str, Any] = {
+        "evidenceIds": finding.evidence_ids,
+        "confidence": finding.confidence,
+        "affectedAsset": affected,
+    }
+    if finding.remediation:
+        properties["remediation"] = finding.remediation
+    if finding.verification_status:
+        properties["verificationStatus"] = finding.verification_status
     return {
         "ruleId": finding.check_slug,
         "level": _LEVEL_BY_SEVERITY.get(finding.severity, "note"),
         "message": {
             "text": finding.title,
-            "markdown": f"**{finding.title}** — {finding.impact}",
+            "markdown": markdown,
         },
         "locations": [
             {
@@ -73,13 +88,7 @@ def _result_for(finding: SecurityFinding, report: PortalReport) -> dict[str, Any
                 }
             }
         ],
-        "properties": {
-            "evidenceIds": finding.evidence_ids,
-            "confidence": finding.confidence,
-            "affectedAsset": affected,
-            "remediation": finding.remediation,
-            "verificationStatus": finding.verification_status,
-        },
+        "properties": properties,
     }
 
 

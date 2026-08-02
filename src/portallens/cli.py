@@ -16,8 +16,9 @@ session-2 invocation form that scripts may depend on::
     portallens "http://maz.wifi/login?dst=..." \\
         "https://captive.ispman.tech/hotspots/.../select?..."
 
-Active analysis (``--fetch-urls``, ``--resolve-dns``) requires
-``--i-have-authorization`` in both subcommands — ADR-1 is unchanged.
+Active analysis requires the single ``--authorized`` flag (ADR-15 — one
+flag unlocks every active technique; passive remains the default). It is
+shared by ``analyze``, ``tui``, ``investigate``, and ``step``.
 
 Examples
 --------
@@ -30,9 +31,9 @@ TUI on the same URL pair (requires ``pip install -e ".[tui]"``)::
     portallens tui "http://maz.wifi/login?dst=..." \\
         "https://captive.ispman.tech/hotspots/.../select?..."
 
-Active analysis — requires explicit authorization for the target::
+Active analysis — the caller asserts authorization for the target::
 
-    portallens --fetch-urls --i-have-authorization "https://example.com/login"
+    portallens --authorized "https://example.com/login"
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ from collections.abc import Sequence
 
 import click
 
+from portallens.acquisition import AcquisitionDenied
 from portallens.output import echo
 from portallens.plugins.captive_wifi import CaptiveWifiPortal  # noqa: F401 — registers the plugin
 from portallens.portal import AcquisitionPolicy, AnalysisContext, PortalReport, PortalType
@@ -59,40 +61,21 @@ from portallens.reporting import render_markdown
 def _run_analysis(
     urls: Sequence[str],
     portal_type: str,
-    fetch_urls: bool,
-    follow_redirects: bool,
-    resolve_dns: bool,
-    port_scan: bool,
-    authorization_confirmed: bool,
+    authorized: bool,
     notes: str | None,
 ) -> PortalReport:
     """Run analysis and return the :class:`PortalReport`.
 
     Shared by both subcommands. Raises :class:`SystemExit` on
-    authorization or plugin-lookup failure (after printing a message).
+    plugin-lookup failure (after printing a message).
     """
 
     if not urls:
         echo("Error: at least one URL is required.", err=True)
         sys.exit(2)
 
-    # Active-mode guard — require explicit authorization confirmation.
-    active = any((fetch_urls, follow_redirects, resolve_dns, port_scan))
-    if active and not authorization_confirmed:
-        echo(
-            "Active analysis (--fetch-urls / --follow-redirects / --resolve-dns / "
-            "--port-scan) requires explicit authorization for every URL supplied.\n"
-            "Re-run with --i-have-authorization if you have it.",
-            err=True,
-        )
-        sys.exit(2)
-
-    policy = AcquisitionPolicy(
-        fetch_urls=fetch_urls,
-        follow_redirects=follow_redirects,
-        resolve_dns=resolve_dns,
-        port_scan=port_scan,
-    )
+    # ADR-15: the single `authorized` flag unlocks every active technique.
+    policy = AcquisitionPolicy(authorized=authorized)
 
     context = AnalysisContext(
         urls=list(urls),
@@ -114,8 +97,8 @@ def _run_analysis(
     # authorized active-assessment over the report's observed hosts and merge
     # the probe evidence + findings back into the report. OSINT (RIPEstat)
     # is NOT part of this pass — it runs as a `portallens step` against a
-    # persisted investigation, per ADR-9/13.
-    if port_scan:
+    # persisted investigation, per ADR-9.
+    if authorized:
         report = _run_netaudit(report, policy)
     return report
 
@@ -133,39 +116,15 @@ _PORTAL_TYPE_OPTION = click.option(
     show_default=True,
     help="Portal type to analyze as. Defaults to captive_wifi - the only implemented plugin today.",
 )
-_FETCH_OPTION = click.option(
-    "--fetch-urls",
-    is_flag=True,
-    default=False,
-    help="Enable active HTTP fetching. Requires --i-have-authorization.",
-)
-_FOLLOW_REDIRECTS_OPTION = click.option(
-    "--follow-redirects",
-    is_flag=True,
-    default=False,
-    help="Follow HTTP redirects when --fetch-urls is set. Off by default.",
-)
-_RESOLVE_DNS_OPTION = click.option(
-    "--resolve-dns",
-    is_flag=True,
-    default=False,
-    help="Enable active DNS resolution. Requires --i-have-authorization.",
-)
-_PORT_SCAN_OPTION = click.option(
-    "--port-scan",
-    is_flag=True,
-    default=False,
-    help="Enable active admin-port probing (NetAudit). Requires --i-have-authorization.",
-)
-_AUTH_OPTION = click.option(
-    "--i-have-authorization",
-    "authorization_confirmed",
+_AUTHORIZED_OPTION = click.option(
+    "--authorized",
+    "authorized",
     is_flag=True,
     default=False,
     help=(
-        "Confirm you have authorization for active analysis of every URL supplied. "
-        "Required when any active flag (--fetch-urls / --resolve-dns / --port-scan) is set. "
-        "OSINT-only techniques (RIPEstat) run per-step via `portallens authorize + step`."
+        "Enable ALL active techniques (HTTP fetching, DNS resolution, "
+        "admin-port probing, OSINT lookups). ADR-15: one flag unlocks "
+        "every active technique. Passive is the default."
     ),
 )
 _NOTES_OPTION = click.option(
@@ -296,11 +255,7 @@ def main(ctx: click.Context) -> None:
 @main.command(name="analyze")
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
-@_FETCH_OPTION
-@_FOLLOW_REDIRECTS_OPTION
-@_RESOLVE_DNS_OPTION
-@_PORT_SCAN_OPTION
-@_AUTH_OPTION
+@_AUTHORIZED_OPTION
 @_NOTES_OPTION
 @_FORMAT_OPTION
 @click.option(
@@ -314,11 +269,7 @@ def main(ctx: click.Context) -> None:
 def analyze(
     urls: tuple[str, ...],
     portal_type: str,
-    fetch_urls: bool,
-    follow_redirects: bool,
-    resolve_dns: bool,
-    port_scan: bool,
-    authorization_confirmed: bool,
+    authorized: bool,
     output: str | None,
     output_format: str,
     notes: str | None,
@@ -328,11 +279,7 @@ def analyze(
     report = _run_analysis(
         urls=urls,
         portal_type=portal_type,
-        fetch_urls=fetch_urls,
-        follow_redirects=follow_redirects,
-        resolve_dns=resolve_dns,
-        port_scan=port_scan,
-        authorization_confirmed=authorization_confirmed,
+        authorized=authorized,
         notes=notes,
     )
     rendered = _render(report, output_format)
@@ -349,20 +296,12 @@ def analyze(
 @main.command(name="tui")
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
-@_FETCH_OPTION
-@_FOLLOW_REDIRECTS_OPTION
-@_RESOLVE_DNS_OPTION
-@_PORT_SCAN_OPTION
-@_AUTH_OPTION
+@_AUTHORIZED_OPTION
 @_NOTES_OPTION
 def tui(
     urls: tuple[str, ...],
     portal_type: str,
-    fetch_urls: bool,
-    follow_redirects: bool,
-    resolve_dns: bool,
-    port_scan: bool,
-    authorization_confirmed: bool,
+    authorized: bool,
     notes: str | None,
 ) -> None:
     """Analyze portal URLs, then open the investigation-console TUI.
@@ -373,11 +312,7 @@ def tui(
     report = _run_analysis(
         urls=urls,
         portal_type=portal_type,
-        fetch_urls=fetch_urls,
-        follow_redirects=follow_redirects,
-        resolve_dns=resolve_dns,
-        port_scan=port_scan,
-        authorization_confirmed=authorization_confirmed,
+        authorized=authorized,
         notes=notes,
     )
 
@@ -402,30 +337,26 @@ def tui(
 
 
 # ---------------------------------------------------------------------------
-# Investigation persistence (ADR-8) — create, list, show, authorize.
+# Investigation persistence (ADR-8) — create, list, show, step.
 # These operate on the SQLite store; `investigate` runs step-zero analysis
 # and persists the result, the rest read/update stored investigations.
+# ADR-15 removed the `authorize` verb: the single `--authorized` flag on
+# `investigate`/`analyze` is the one authorization gate, and `step` reuses
+# it via its own `--authorized` flag rather than a stored per-technique
+# record.
 # ---------------------------------------------------------------------------
 
 
 @main.command(name="investigate")
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
-@_FETCH_OPTION
-@_FOLLOW_REDIRECTS_OPTION
-@_RESOLVE_DNS_OPTION
-@_PORT_SCAN_OPTION
-@_AUTH_OPTION
+@_AUTHORIZED_OPTION
 @_NOTES_OPTION
 @_DB_OPTION
 def investigate(
     urls: tuple[str, ...],
     portal_type: str,
-    fetch_urls: bool,
-    follow_redirects: bool,
-    resolve_dns: bool,
-    port_scan: bool,
-    authorization_confirmed: bool,
+    authorized: bool,
     notes: str | None,
     db_path: str | None,
 ) -> None:
@@ -440,11 +371,7 @@ def investigate(
     report = _run_analysis(
         urls=urls,
         portal_type=portal_type,
-        fetch_urls=fetch_urls,
-        follow_redirects=follow_redirects,
-        resolve_dns=resolve_dns,
-        port_scan=port_scan,
-        authorization_confirmed=authorization_confirmed,
+        authorized=authorized,
         notes=notes,
     )
     investigation = Investigation.start(
@@ -486,7 +413,7 @@ def investigations(db_path: str | None) -> None:
 
 @main.command(name="show")
 @click.argument("investigation_id")
-@click.option("--audit", is_flag=True, default=False, help="Show the audit log and authorizations instead of the report.")
+@click.option("--audit", is_flag=True, default=False, help="Show the audit log instead of the report.")
 @_FORMAT_OPTION
 @_DB_OPTION
 def show(investigation_id: str, audit: bool, output_format: str, db_path: str | None) -> None:
@@ -508,64 +435,25 @@ def show(investigation_id: str, audit: bool, output_format: str, db_path: str | 
     echo(f"# Audit trail - {investigation.id}")
     echo(f"\nTarget: {investigation.target}")
     echo(f"Created: {investigation.created_at.isoformat(timespec='seconds')}")
-    granted = ", ".join(sorted(investigation.authorized_techniques)) or "none"
-    echo(f"Authorized techniques: {granted}")
     echo("\n## Log")
     for entry in investigation.audit_log:
         echo(f"  [{entry.at.isoformat(timespec='seconds')}] {entry.kind}: {entry.detail}")
 
 
-@main.command(name="authorize")
-@click.argument("investigation_id")
-@click.option(
-    "--technique",
-    required=True,
-    help="The active technique you assert authorization for (e.g. fetch_urls, resolve_dns).",
-)
-@click.option("--note", default=None, help="Optional note recorded with the authorization.")
-@_DB_OPTION
-def authorize(investigation_id: str, technique: str, note: str | None, db_path: str | None) -> None:
-    """Record, per ADR-10, that you assert authorization for one active technique.
-
-    The assertion is timestamped and appended to the investigation's audit
-    trail. It does not itself run anything — it is the recorded authorization
-    a later active step checks against.
-    """
-
-    from portallens.investigation import InvestigationStore
-
-    with InvestigationStore(db_path) as store:
-        investigation = store.get(investigation_id)
-        if investigation is None:
-            echo(f"No investigation with id {investigation_id!r}.", err=True)
-            sys.exit(1)
-        try:
-            grant = investigation.authorize(technique, note=note)
-        except ValueError as exc:
-            echo(f"Error: {exc}", err=True)
-            sys.exit(2)
-        store.save(investigation)
-
-    echo(
-        f"Authorization recorded for {grant.technique!r} on {investigation.id} "
-        f"at {grant.granted_at.isoformat(timespec='seconds')}."
-    )
-
-
 @main.command(name="step")
 @click.argument("investigation_id")
 @click.argument("step_slug")
+@_AUTHORIZED_OPTION
 @_DB_OPTION
-def step(investigation_id: str, step_slug: str, db_path: str | None) -> None:
+def step(investigation_id: str, step_slug: str, authorized: bool, db_path: str | None) -> None:
     """Run one registered analysis step against a saved investigation (ADR-9).
 
-    Loads the investigation, checks the step's authorization requirement
-    (ADR-10), runs the step, appends its evidence to the persisted
-    investigation, and saves. This is the "pull the thread" loop:
+    Loads the investigation, runs the step, appends its evidence to the
+    persisted investigation, and saves. ADR-15: active steps unlock behind
+    the single ``--authorized`` flag — no per-technique `authorize` record
+    exists anymore. This is the "pull the thread" loop:
 
-        portallens authorize <id> --technique resolve_dns
-        portallens step <id> resolve_dns
-        portallens step <id> ip_asn_lookup
+        portallens step <id> ip_asn_lookup --authorized
     """
 
     from portallens.investigation import InvestigationStore
@@ -587,29 +475,21 @@ def step(investigation_id: str, step_slug: str, db_path: str | None) -> None:
             )
             sys.exit(2)
 
-        if step_.requires and not investigation.is_authorized(step_.requires):
-            echo(
-                f"Step {step_slug!r} requires authorization for {step_.requires!r}, "
-                f"which is not recorded for {investigation.id}.\n"
-                f"Record it first: portallens authorize {investigation.id} "
-                f"--technique {step_.requires}",
-                err=True,
-            )
+        # ADR-15: one `authorized` flag unlocks every active technique. The
+        # step runs under exactly the caller's assertion — the single flag,
+        # not a per-technique record. A passive invocation of an active step
+        # is refused here, not with a traceback.
+        policy = AcquisitionPolicy(authorized=authorized)
+        try:
+            evidence = step_.run(investigation, policy)
+        except AcquisitionDenied as exc:
+            echo(f"Error: {exc}", err=True)
             sys.exit(2)
-
-        # Run with exactly the techniques the operator has recorded
-        # authorization for (ADR-10 scope is a set, never implied — ADR-13).
-        # `_policy_for_technique` would enable only the step's `requires`,
-        # which would strand ip_asn_lookup on hostname targets: it needs
-        # resolve_dns too, and only an explicit resolve_dns authorization
-        # may enable it.
-        policy = _policy_for_authorizations(investigation.authorized_techniques)
-        evidence = step_.run(investigation, policy)
         if evidence:
             investigation.append_evidence(evidence, step=step_.slug)
         else:
-            # A step that found nothing is itself audit-worthy (ADR-10):
-            # "resolve_dns ran, returned no records" is defensibility evidence.
+            # A step that found nothing is itself audit-worthy: "resolve_dns
+            # ran, returned no records" is defensibility evidence.
             investigation.record("step", f"Analysis step {step_slug!r} ran and produced no evidence.")
         # New evidence may fire checks the passive pass didn't see, and may
         # answer open questions — recompute both so the persisted report is
@@ -631,40 +511,7 @@ def step(investigation_id: str, step_slug: str, db_path: str | None) -> None:
         echo(f"Step {step_slug!r} produced {len(evidence)} evidence record(s).")
         for ev in evidence:
             echo(f"  [{ev.type.value}] {ev.key}: {ev.value}")
-        # ADR-13 transparency: if the step skipped hostnames for lack of DNS
-        # consent, say so — "produced 0" must never be a silent no-op.
-        if step_.slug == "ip_asn_lookup":
-            from portallens.steps.ip_asn import dnsless_hostnames
-
-            skipped = dnsless_hostnames(investigation, policy)
-            if skipped:
-                echo(
-                    f"  (hostnames skipped - OSINT consent never implies DNS "
-                    f"consent; authorize resolve_dns to resolve then look up: "
-                    f"portallens authorize {investigation.id} --technique resolve_dns. "
-                    f"Skipped: {', '.join(skipped)})"
-                )
         echo(f"Investigation {investigation.id} updated (audit log appended).")
-
-
-def _policy_for_authorizations(authorized: set[str]) -> AcquisitionPolicy:
-    """Build the policy a step runs under, from recorded authorizations.
-
-    The `step` verb enables exactly the techniques the operator has recorded
-    authorization for (ADR-10: scope is a set). A step may need more than its
-    own ``requires`` slug — ``ip_asn_lookup`` needs ``resolve_dns`` to resolve
-    hostname targets before the ASN lookup — and only an explicit, recorded
-    resolve_dns authorization may enable it (ADR-13: no flag implies another).
-    """
-
-    return AcquisitionPolicy(
-        fetch_urls="fetch_urls" in authorized,
-        follow_redirects="follow_redirects" in authorized,
-        resolve_dns="resolve_dns" in authorized,
-        probe_tls="probe_tls" in authorized,
-        port_scan="port_scan" in authorized,
-        use_osint_apis="use_osint_apis" in authorized,
-    )
 
 
 if __name__ == "__main__":

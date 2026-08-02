@@ -103,7 +103,7 @@ app.run()
 
 ### Saved investigations
 
-Analysis can be persisted instead of printed. An **investigation** outlives the process — it has an id, keeps the report, records which active techniques you've asserted authorization for (each timestamped), and an audit log of what was done.
+Analysis can be persisted instead of printed. An **investigation** outlives the process — it has an id, keeps the report, and an audit log of what was done. Authorization is a single flag at invocation (ADR-15), not a per-technique record.
 
 ```bash
 # Analyze and save; prints the new investigation's id
@@ -111,18 +111,17 @@ portallens investigate "http://portal.example/login?dst=..." "https://captive.ex
 
 portallens investigations                 # list saved investigations, newest first
 portallens show <id>                      # render the stored report
-portallens show <id> --audit              # show the authorization + audit trail
-portallens authorize <id> --technique resolve_dns --note "customer confirmed"
+portallens show <id> --audit              # show the audit trail
 ```
 
 The database lives at `$XDG_DATA_HOME/portallens/investigations.db` by default (override with `--db` or `$PORTALLENS_DB`). It is plain SQLite — no server, works on desktop and on a phone under Termux.
 
 ### Active analysis (requires explicit authorization)
 
-Active techniques — HTTP fetching, DNS resolution, port scanning — are gated behind an `AcquisitionPolicy` and a CLI authorization flag. The default policy is **passive**.
+Active techniques — HTTP fetching, DNS resolution, port scanning, OSINT lookups — are gated behind an `AcquisitionPolicy` and the single `--authorized` CLI flag (ADR-15: one flag unlocks every active technique). The default policy is **passive**.
 
 ```bash
-portallens --fetch-urls --i-have-authorization "https://example.com/login"
+portallens --authorized "https://example.com/login"
 ```
 
 **Do not run active analysis against networks you do not own or have explicit written permission to assess.**
@@ -171,7 +170,7 @@ Multiple independent evidence signals are combined via a noisy-OR rule (`score([
 ## What PortalLens does NOT do
 
 - **It does not bypass authentication.** PortalLens analyzes portal URLs passively. It never submits credentials, never tries to skip the captive-portal handshake, and never attempts to obtain free internet access.
-- **It does not actively probe networks without authorization.** Every active technique (HTTP fetch, DNS lookup, port scan, TLS probe) requires an explicit `AcquisitionPolicy` flag in the library, or `--i-have-authorization` on the CLI. **The caller is responsible for ensuring they have authorization for the target.**
+- **It does not actively probe networks without authorization.** Every active technique (HTTP fetch, DNS lookup, port scan, OSINT lookup) is unlocked by `AcquisitionPolicy(authorized=True)` in the library, or `--authorized` on the CLI (ADR-15). **The caller is responsible for ensuring they have authorization for the target.**
 - **It does not guess.** If the evidence can't distinguish a reseller from an operator using a 3rd-party platform, PortalLens says so — explicitly, as a hypothesis with `low` confidence, and lists what evidence would resolve the question.
 
 ## Responsible disclosure

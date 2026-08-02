@@ -5,8 +5,11 @@ A step is a registered, runnable unit of investigation. Each step declares:
 - ``slug`` — the stable identifier (open questions name these in their
   ``resolves_with`` lists).
 - ``requires`` — the ``AcquisitionPolicy`` technique it needs (``None`` =
-  passive). Per ADR-10, an active step also checks the investigation's
-  recorded authorization before running.
+  passive). ADR-15 collapsed the per-technique consent model into a single
+  ``AcquisitionPolicy.authorized`` flag, so ``requires`` is now **descriptive**
+  metadata (which technique the step exercises) rather than a gate the step
+  checks against recorded authorizations. The single flag is checked by
+  ``assert_policy`` inside the step's ``run``.
 - ``produces`` — the evidence types the step emits.
 - ``answers`` — the open-question relationship kinds it can answer.
 - ``run`` — the executable that turns an investigation into evidence.
@@ -36,7 +39,7 @@ class AnalysisStep:
 
     slug: str
     label: str
-    requires: str | None  # AcquisitionPolicy technique name; None = passive
+    requires: str | None  # descriptive: the AcquisitionPolicy technique the step exercises (ADR-15: no longer a per-technique gate)
     produces: tuple[EvidenceType, ...]
     answers: tuple[RelationshipKind, ...]
     run: Callable[[Investigation, AcquisitionPolicy], list[Evidence]]
