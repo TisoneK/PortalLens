@@ -68,3 +68,7 @@ records.
 - **2026-08-02 — Session 13** — Buffy / deepseek-v4-flash — shipped bounded authorized captive-portal bypass probes (CONNECT, DNS tunnel, click-through, port scan, parameter tampering), typed bypass evidence, and report-level potential-bypass findings via `detect_bypass` / `merge_bypass_evidence`. 220 tests, Ruff, mypy clean.
   Key decision: keep probes caller-driven and passive by default; open ports remain informational prerequisite evidence, not bypass proof. Product commit c23f0e6 pushed.
   Detail: .context/memory/reviews/2026-08-02-review.md
+
+--
+- **2026-08-02 — Session 14** — Buffy / deepseek-v4-flash — refined the kickoff feature list against existing ADRs (ADR-15 single-auth model, ADR-16 per-action discipline, ADR-18 probe-only "never authenticate" boundary). Plan-only — no `src/` commits. Six backlog entries appended; ADR-19 drafted as the three-category per-action exemplar for session replay (synthetic / owned-target approved; captured-real refused). Items that cross ADR-18 (default creds, MAC impersonation, captured-real replay) explicitly routed through per-action ADR-16 review before any code may land.
+  Detail: .context/memory/sessions/2026-08-02-14/notes.md

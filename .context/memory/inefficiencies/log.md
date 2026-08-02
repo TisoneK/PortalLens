@@ -153,3 +153,19 @@ if literally nothing slowed you down.
 - **Cause:** The mutation helper correctly percent-encodes the sentinel, while the test callback initially searched the raw URL; one replacement joined a declaration and loop on the same line.
 - **Workaround / fix:** Re-read the actual file, used URL decoding in the injected test request, added a default-sentinel regression, and reran Ruff, strict mypy, full pytest, and `git diff --check`.
 - **Prevent next time:** When testing URL mutations, inspect decoded query values rather than raw serialized URLs; after chained exact replacements, run syntax/lint immediately before broader tests.
+
+--
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 14)
+- **Problem:** First-pass `str_replace` to append six backlog items to `tasks/backlog.md` mistakenly re-listed the two Session-13 entries ("CLI/investigation orchestration for bypass probes" and "Calibrate bypass verification") at the bottom of the new block, marked *(session-13 entry, kept)*. File momentarily contained sentence-for-sentence duplicates of items already present at the top of my `oldString` anchor.
+- **Cost:** One extra `str_replace` to scrub the duplicates; otherwise no impact (caught before commit).
+- **Cause:** I was treating append-only as "append + optional re-list of older items for emphasis", which was neither needed nor useful; the originals stand by themselves and adding placeholders like *(kept)* duplicates them visually.
+- **Workaround / fix:** Targeted the duplicated tail block with a single `str_replace` and removed the two extraneous entries. The new Session-14 additions stand on their own; no re-listing of older items.
+- **Prevent next time:** When appending to an append-only file with a known tail, anchor on the **last** existing item and append only the new entries — do not include older items in the new content. "Kept" placeholders for unmodified older entries are noise; anything that needs to be referenced aloud belongs in the *current* entry's prose.
+
+--
+## 2026-08-02 — Buffy / deepseek-v4-flash (Session 14 (2))
+- **Problem:** `read_files` (and the thinker's `read_files`) was truncated by the harness's 20,000-token ceiling whenever I asked for several large `.context/memory/` files in one call. Files like `agents/sessions.md` and `plans/decisions.md` came back with the last ~30% cut off, forcing me to re-read individually or piece content from earlier calls.
+- **Cost:** ~3 extra read calls across the session; no functional impact because both me and the thinker had enough from the partial reads.
+- **Cause:** I bundled too many large files into single `read_files` calls; the per-call token cap truncates rather than errors.
+- **Workaround / fix:** When context density is the goal, prefer smaller targeted calls or have the thinker handle the heavy reads. Worked around here because I had prior partial reads.
+- **Prevent next time:** For `.context/memory/` reads, prefer two or three smaller `read_files` calls over one big one, or pass a single large file plus context to the thinker and let it budget internally.
