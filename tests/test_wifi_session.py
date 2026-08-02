@@ -136,6 +136,95 @@ class TestWifiSessionController:
 
 
 @pytest.mark.asyncio
+async def test_picker_keyboard_selection_exits_without_crashing() -> None:
+    from portallens.wifi.picker import WifiPickerApp
+
+    network = _net("Guest", "aa:bb:cc:dd:ee:12")
+    adapter = FakeAdapter(((network,),))
+    controller = WifiSessionController(adapter)
+    app = WifiPickerApp(adapter, controller=controller)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        networks = app.query_one("#networks")
+        networks.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause()
+        assert not app.is_running
+        assert app.selected_network == network
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_picker_disables_stale_rows_during_scan() -> None:
+    from portallens.wifi.picker import WifiPickerApp
+
+    network = _net("Guest", "aa:bb:cc:dd:ee:13")
+    adapter = FakeAdapter(((network,),))
+    controller = WifiSessionController(
+        adapter,
+        initial_state=WifiPickerState(
+            phase=WifiPickerPhase.READY,
+            networks=(network,),
+            generation=1,
+        ),
+    )
+    app = WifiPickerApp(adapter, controller=controller, auto_scan=False)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        app._render_state(
+            WifiPickerState(
+                phase=WifiPickerPhase.SCANNING,
+                networks=(network,),
+                generation=2,
+            )
+        )
+        assert app.query_one("#networks").disabled
+        app._render_state(
+            WifiPickerState(
+                phase=WifiPickerPhase.READY,
+                networks=(network,),
+                generation=2,
+            )
+        )
+        assert not app.query_one("#networks").disabled
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_picker_manual_rescan_does_not_overlap_active_scan() -> None:
+    from portallens.wifi.picker import WifiPickerApp
+
+    network = _net("Guest", "aa:bb:cc:dd:ee:14")
+    adapter = FakeAdapter(((network,),), block_first=True)
+    controller = WifiSessionController(adapter)
+    app = WifiPickerApp(adapter, controller=controller, auto_scan=False)
+    async with app.run_test(size=(100, 30)) as pilot:
+        app.action_rescan()
+        await pilot.pause()
+        app.action_rescan()
+        assert adapter.calls == 1
+        adapter.release.set()
+        await pilot.pause(0.1)
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_picker_auto_refreshes_networks() -> None:
+    from portallens.wifi.picker import WifiPickerApp
+
+    network = _net("Guest", "aa:bb:cc:dd:ee:11")
+    adapter = FakeAdapter(((network,),))
+    controller = WifiSessionController(adapter)
+    app = WifiPickerApp(adapter, controller=controller, refresh_interval=0.1)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause(0.35)
+        assert adapter.calls >= 2
+        assert len(app.query_one("#networks").children) == 1
+    assert app._refresh_timer is None
+    controller.close()
+
+
+@pytest.mark.asyncio
 async def test_picker_renders_networks_and_selects_without_connecting() -> None:
     from portallens.wifi.picker import WifiNetworkItem, WifiPickerApp
 

@@ -10,6 +10,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.timer import Timer
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
 
 from portallens.wifi.adapter import WifiAdapter
@@ -66,14 +67,18 @@ class WifiPickerApp(App[WifiNetwork | None]):
         *,
         controller: WifiSessionController | None = None,
         auto_scan: bool = True,
+        refresh_interval: float = 10.0,
     ) -> None:
         super().__init__()
         self._controller = controller or WifiSessionController(adapter)
         self._owns_controller = controller is None
         self._auto_scan = auto_scan
+        self._refresh_interval = max(0.1, refresh_interval)
         self._latest_state = self._controller.state
         self._selected: WifiNetwork | None = None
         self._ui_thread_ident: int | None = None
+        self._refresh_timer: Timer | None = None
+        self._rendered_rows: tuple[tuple[object, ...], ...] = ()
 
     @property
     def controller(self) -> WifiSessionController:
@@ -102,8 +107,15 @@ class WifiPickerApp(App[WifiNetwork | None]):
         self._render_state(self._latest_state)
         if self._auto_scan:
             self.action_rescan()
+            self._refresh_timer = self.set_interval(
+                self._refresh_interval, lambda: self.action_rescan(automatic=True)
+            )
 
-    def action_rescan(self) -> None:
+    def action_rescan(self, *, automatic: bool = False) -> None:
+        if self._controller.state.phase is WifiPickerPhase.SCANNING:
+            if not automatic:
+                self._render_error("a Wi-Fi scan is already in progress")
+            return
         try:
             self._controller.scan()
         except RuntimeError as exc:
@@ -148,13 +160,24 @@ class WifiPickerApp(App[WifiNetwork | None]):
         status.update(self._status_text(state))
         network_list = self.query_one("#networks", ListView)
         if state.phase is WifiPickerPhase.SCANNING:
-            network_list.clear()
+            # Keep existing rows visible while the replacement scan runs;
+            # Textual mounts ListItems asynchronously. The rows are stale
+            # until the scan completes, so prevent selecting one.
+            network_list.disabled = True
+            return
         elif state.phase is WifiPickerPhase.READY:
-            network_list.clear()
-            for network in state.networks:
-                network_list.append(WifiNetworkItem(network))
+            network_list.disabled = False
+            desired_rows = _network_display_state(state)
+            if desired_rows != self._rendered_rows:
+                self._rendered_rows = desired_rows
+                network_list.clear()
+                for network in state.networks:
+                    network_list.append(WifiNetworkItem(network))
         elif state.phase is WifiPickerPhase.FAILED:
+            network_list.disabled = True
             self._render_error(state.error or "Wi-Fi scan failed")
+        elif state.phase is WifiPickerPhase.CANCELLED:
+            network_list.disabled = True
 
     def _render_error(self, message: str) -> None:
         self.query_one("#status", Static).update(f"Error: {message}")
@@ -172,9 +195,27 @@ class WifiPickerApp(App[WifiNetwork | None]):
         return "Ready — press r to scan"
 
     def on_unmount(self) -> None:
+        if self._refresh_timer is not None:
+            self._refresh_timer.stop()
+            self._refresh_timer = None
         self._controller.set_listener(None)
         if self._owns_controller:
             self._controller.close()
+
+
+def _network_display_state(state: WifiPickerState) -> tuple[tuple[object, ...], ...]:
+    """Return scan fields that can change what a rendered row displays."""
+
+    return tuple(_network_display_item(network) for network in state.networks)
+
+
+def _network_display_item(network: WifiNetwork) -> tuple[object, ...]:
+    return (
+        network.identity,
+        network.display_name,
+        network.security.value,
+        network.signal_percent,
+    )
 
 
 __all__ = ["WifiNetworkItem", "WifiPickerApp"]

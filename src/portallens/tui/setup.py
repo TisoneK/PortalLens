@@ -182,18 +182,22 @@ class PortalLensSetupApp(App[SetupResult | None]):
         *,
         controller: WifiSessionController | None = None,
         auto_scan: bool = True,
+        refresh_interval: float = 10.0,
     ) -> None:
         super().__init__()
         self._adapter = adapter
         self._controller = controller or WifiSessionController(adapter)
         self._owns_controller = controller is None
         self._auto_scan = auto_scan
+        self._refresh_interval = max(0.1, refresh_interval)
         self._latest_state = self._controller.state
         self._selected: WifiNetwork | None = None
         self._ui_thread_ident: int | None = None
         self._started = False
         self._status_timer: Timer | None = None
+        self._refresh_timer: Timer | None = None
         self._status_cancel: CancellationToken | None = None
+        self._rendered_rows: tuple[tuple[object, ...], ...] = ()
 
     @property
     def controller(self) -> WifiSessionController:
@@ -266,9 +270,19 @@ class PortalLensSetupApp(App[SetupResult | None]):
         self._feed("Choose a URL or scan and select a Wi-Fi network.")
         if self._auto_scan:
             self.action_scan()
+            self._refresh_timer = self.set_interval(self._refresh_interval, self._refresh_scan)
 
-    def action_scan(self) -> None:
-        if self._started:
+    def _refresh_scan(self) -> None:
+        """Refresh discovery without interrupting read-only monitoring."""
+
+        self.action_scan(automatic=True)
+
+    def action_scan(self, *, automatic: bool = False) -> None:
+        if self._controller.state.phase is WifiPickerPhase.SCANNING:
+            if not automatic:
+                self._feed("A Wi-Fi scan is already in progress.")
+            return
+        if self._started and not automatic:
             self._feed("Stop the current session before scanning again.")
             return
         try:
@@ -427,27 +441,38 @@ class PortalLensSetupApp(App[SetupResult | None]):
         self._feed("Session stopped.")
 
     def _receive_state(self, state: WifiPickerState) -> None:
-        self._latest_state = state
         if self._ui_thread_ident == get_ident():
             self._render_state(state)
         elif self.is_running:
             with suppress(RuntimeError):
                 self.call_from_thread(self._render_state, state)
+        else:
+            self._latest_state = state
 
     def _render_state(self, state: WifiPickerState) -> None:
         self._latest_state = state
         networks = self.query_one("#networks", ListView)
         if state.phase is WifiPickerPhase.SCANNING:
-            networks.clear()
+            # Keep the previous rows visible while the replacement scan runs;
+            # Textual mounts ListItems asynchronously, so clearing here can
+            # race with a pending mount and leave the list empty. The rows are
+            # stale until the scan completes, so prevent selecting one.
+            networks.disabled = True
             self._set_status("Scanning nearby Wi-Fi networks …")
         elif state.phase is WifiPickerPhase.READY:
-            networks.clear()
-            for network in state.networks:
-                networks.append(SetupNetworkItem(network))
+            networks.disabled = False
+            desired_rows = _network_display_state(state)
+            if desired_rows != self._rendered_rows:
+                self._rendered_rows = desired_rows
+                networks.clear()
+                for network in state.networks:
+                    networks.append(SetupNetworkItem(network))
             self._set_status(f"{len(state.networks)} network(s) found — choose one")
         elif state.phase is WifiPickerPhase.FAILED:
+            networks.disabled = True
             self._set_status(state.error or "Wi-Fi scan failed", error=True)
         elif state.phase is WifiPickerPhase.CANCELLED:
+            networks.disabled = True
             self._set_status("Scan cancelled — press r or Scan nearby Wi-Fi to try again")
 
     def _set_status(self, message: str, *, error: bool = False) -> None:
@@ -464,13 +489,32 @@ class PortalLensSetupApp(App[SetupResult | None]):
         self.exit()
 
     def on_unmount(self) -> None:
+        if self._refresh_timer is not None:
+            self._refresh_timer.stop()
+            self._refresh_timer = None
         if self._status_timer is not None:
             self._status_timer.stop()
+            self._status_timer = None
         if self._status_cancel is not None:
             self._status_cancel.cancel()
         self._controller.set_listener(None)
         if self._owns_controller:
             self._controller.close()
+
+
+def _network_display_state(state: WifiPickerState) -> tuple[tuple[object, ...], ...]:
+    """Return scan fields that can change what a rendered row displays."""
+
+    return tuple(_network_display_item(network) for network in state.networks)
+
+
+def _network_display_item(network: WifiNetwork) -> tuple[object, ...]:
+    return (
+        network.identity,
+        network.display_name,
+        network.security.value,
+        network.signal_percent,
+    )
 
 
 __all__ = ["PortalLensSetupApp", "SetupNetworkItem", "SetupResult", "SetupUnavailableAdapter"]

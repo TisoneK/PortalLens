@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import Event
 
 import pytest
 from click.testing import CliRunner
@@ -17,7 +18,7 @@ from portallens.wifi import (
     WifiSecurity,
 )
 from portallens.wifi.errors import WifiOperationCancelled
-from portallens.wifi.session import WifiPickerPhase, WifiSessionController
+from portallens.wifi.session import WifiPickerPhase, WifiPickerState, WifiSessionController
 
 
 @dataclass
@@ -34,8 +35,10 @@ class SetupAdapter:
             can_status=True,
         )
         self.status_calls = 0
+        self.scan_calls = 0
 
     def scan(self, *, cancel: CancellationToken | None = None):
+        self.scan_calls += 1
         if cancel is not None:
             cancel.raise_if_cancelled()
         return (self.network,)
@@ -53,6 +56,22 @@ class SetupAdapter:
 
     def disconnect(self, *, cancel: CancellationToken | None = None):
         raise AssertionError("setup must not disconnect from Wi-Fi")
+
+
+class BlockingScanAdapter(SetupAdapter):
+    """Adapter that keeps discovery active until the test releases it."""
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.scan_started = Event()
+        self.scan_release = Event()
+
+    def scan(self, *, cancel: CancellationToken | None = None):
+        self.scan_started.set()
+        while not self.scan_release.wait(0.01):
+            if cancel is not None:
+                cancel.raise_if_cancelled()
+        return super().scan(cancel=cancel)
 
 
 class BlockingStatusAdapter(SetupAdapter):
@@ -96,6 +115,7 @@ async def test_setup_scans_selects_and_requires_a_target() -> None:
         assert isinstance(item, SetupNetworkItem)
         app.on_list_view_selected(type("Event", (), {"item": item})())
         assert app.selected_network == adapter.network
+        assert len(app.query_one("#networks").children) == 1
         app.query_one("#authorized").value = True
         app.query_one("#monitor").value = True
         await pilot.pause()
@@ -104,6 +124,122 @@ async def test_setup_scans_selects_and_requires_a_target() -> None:
         assert "choose a Wi-Fi network" not in str(app.query_one("#status").render()).lower()
         assert "Read-only Wi-Fi monitoring" in str(app.query_one("#hero").render())
     assert app._started is True
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_setup_keyboard_selection_does_not_crash() -> None:
+    from portallens.tui.setup import PortalLensSetupApp
+
+    adapter = SetupAdapter(_network())
+    controller = WifiSessionController(adapter)
+    app = PortalLensSetupApp(adapter, controller=controller)
+    async with app.run_test(size=(120, 45)) as pilot:
+        await pilot.pause()
+        networks = app.query_one("#networks")
+        networks.focus()
+        await pilot.press("down", "enter")
+        await pilot.pause()
+        assert app.is_running
+        assert app.selected_network == adapter.network
+        assert len(app.query_one("#networks").children) == 1
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_setup_controller_scan_disables_then_reenables_rows() -> None:
+    from portallens.tui.setup import PortalLensSetupApp
+
+    adapter = BlockingScanAdapter(_network())
+    controller = WifiSessionController(adapter)
+    app = PortalLensSetupApp(adapter, controller=controller, auto_scan=False)
+    async with app.run_test(size=(120, 45)) as pilot:
+        app.action_scan()
+        for _ in range(100):
+            if adapter.scan_started.is_set():
+                break
+            await pilot.pause(0.01)
+        assert adapter.scan_started.is_set()
+        await pilot.pause()
+        assert app.query_one("#networks").disabled
+        adapter.scan_release.set()
+        await pilot.pause(0.1)
+        assert controller.state.phase is WifiPickerPhase.READY
+        assert not app.query_one("#networks").disabled
+        assert len(app.query_one("#networks").children) == 1
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_setup_disables_stale_rows_during_scan() -> None:
+    from portallens.tui.setup import PortalLensSetupApp
+
+    network = _network()
+    adapter = SetupAdapter(network)
+    controller = WifiSessionController(
+        adapter,
+        initial_state=WifiPickerState(
+            phase=WifiPickerPhase.READY,
+            networks=(network,),
+            generation=1,
+        ),
+    )
+    app = PortalLensSetupApp(adapter, controller=controller, auto_scan=False)
+    async with app.run_test(size=(120, 45)) as pilot:
+        await pilot.pause()
+        app._render_state(
+            WifiPickerState(
+                phase=WifiPickerPhase.SCANNING,
+                networks=(network,),
+                generation=2,
+            )
+        )
+        assert app.query_one("#networks").disabled
+        app._render_state(
+            WifiPickerState(
+                phase=WifiPickerPhase.READY,
+                networks=(network,),
+                generation=2,
+            )
+        )
+        assert not app.query_one("#networks").disabled
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_setup_manual_rescan_does_not_overlap_active_scan() -> None:
+    from portallens.tui.setup import PortalLensSetupApp
+
+    adapter = BlockingScanAdapter(_network())
+    controller = WifiSessionController(adapter)
+    app = PortalLensSetupApp(adapter, controller=controller, auto_scan=False)
+    async with app.run_test(size=(120, 45)) as pilot:
+        app.action_scan()
+        for _ in range(100):
+            if adapter.scan_started.is_set():
+                break
+            await pilot.pause(0.01)
+        assert adapter.scan_started.is_set()
+        app.action_scan()
+        assert adapter.scan_calls == 0
+        adapter.scan_release.set()
+        await pilot.pause()
+        assert adapter.scan_calls == 1
+    controller.close()
+
+
+@pytest.mark.asyncio
+async def test_setup_auto_refreshes_networks() -> None:
+    from portallens.tui.setup import PortalLensSetupApp
+
+    adapter = SetupAdapter(_network())
+    controller = WifiSessionController(adapter)
+    app = PortalLensSetupApp(adapter, controller=controller, refresh_interval=0.1)
+    async with app.run_test(size=(120, 45)) as pilot:
+        await pilot.pause(0.35)
+        assert adapter.scan_calls >= 2
+        assert len(app.query_one("#networks").children) == 1
+    assert app._refresh_timer is None
     controller.close()
 
 
@@ -161,6 +297,7 @@ async def test_setup_cancels_status_worker_on_unmount() -> None:
         await pilot.pause()
         assert adapter.status_cancel is not None
         assert adapter.status_cancel.is_cancelled
+        assert app._status_timer is None
     controller.close()
 
 

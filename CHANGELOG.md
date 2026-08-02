@@ -12,6 +12,7 @@ All notable changes to PortalLens are listed here in plain language.
 - **A more direct live investigation flow.** A portal URL entered in the setup screen opens the existing live console, where users can follow activity, review evidence, save the investigation, export a report, and run follow-up steps.
 - **Captive-portal detection.** PortalLens can read common connectivity checks and record response or redirect information without automatically opening a browser or following the redirect.
 - **Wi-Fi discovery across desktop systems.** PortalLens can list nearby networks using the operating system's available Wi-Fi tools on Windows, macOS, and Linux.
+- **Smoother Wi-Fi lists.** Selecting a network no longer crashes the setup screen, and nearby networks refresh automatically while the list remains safe to use during an update.
 
 ### Changed
 
