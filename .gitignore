@@ -58,3 +58,6 @@ dmypy.json
 # Project
 /tmp-*
 *.tmp
+
+# Local tool metadata (workspace/project id, per-machine)
+.freebuff/
