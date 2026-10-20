@@ -174,3 +174,43 @@ default** — the exposure finding stands, the catastrophic one does not.
 Telnet admin on the client-facing interface is still worth reporting to the
 operator on its own: RouterOS telnet is cleartext, and the login prompt is
 reachable by every client on the network.
+
+## Why authentication passes with no visible plan (2026-10-21, 02:25)
+
+The real auth path is the ISPMan portal, not the router admin. The URL the
+browser gets is
+`captive.ispman.tech/hotspots/<hotspot>/<session>/<HEX>/ispman-paid/select?mac=…&ip=…&link-login=…`,
+where `<HEX>` is the account label (`4D415859205052495354` = "MAXY PRIST"). The
+portal page offers packages; a purchase writes a *connect* record and hands the
+browser a `link-login` URL, and the router authorizes that MAC/IP. So the
+portal decides *who may buy*, the router decides *how long access lasts*.
+
+The account page (`/usage`, same path, `…/ispman-paid/usage`) is the missing
+ledger — and it contradicts the earlier "nothing here yet" reading, which was a
+different, unaffiliated view. For MAZ-6C43MH ("Maxy prist"):
+
+Payments: 24 records Aug–Oct (KES 8 / 25 / 30), latest 20 Oct 18:00 KES 8,
+19 Oct 11:01 KES 8, 12 Oct 07:14 KES 25.
+
+Connects vs sessions — packages are short, sessions are long:
+
+| Purchased connect | Session observed |
+|---|---|
+| 30MINS@8, 20 Oct 18:00 (expired) | 18:01 → **2h 25m**, 891 MB |
+| 30MINS@8, 19 Oct 11:01 | 29m |
+| 4HOURS, 12 Oct 07:15 | 07:15 1h24m + 08:42 **2h32m** |
+| — no connect — | 20 Oct 22:09 **1h12m**, 1.31 GB |
+| — no connect — | 18 Oct 09:05 **4h22m**, 4.53 GB |
+| — no connect — | 10 Oct 01:08 **7h40m**, 6.73 GB |
+| — no connect — | 7 Oct 04:09 **5h59m**, 6.95 GB |
+
+So "auth passes with no plan" has a concrete shape: a 30-minute purchase
+produces a 2h25m session, and whole multi-hour sessions exist with no purchase
+at all. The package duration is not what bounds the session — the router's own
+session-timeout (the 4h budget we watched renew at 01:09:53) is. The portal
+marks the *connect* expired while the *session* keeps running.
+
+Open question this raises: whether those no-purchase sessions were paid by a
+connect whose record the portal later merged, or whether the router authorizes
+from a stale/bypassed session on reconnect. The 02:48 horizon is the next
+observation point.
