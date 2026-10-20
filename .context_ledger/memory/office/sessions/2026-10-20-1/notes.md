@@ -146,3 +146,31 @@ After the renewal, HTTPS reads to `captive.ispman.tech` began timing out
 (`ReadTimeout` at 15s and again at 40s) while `http://maz.wifi/status` answered
 normally. Not yet diagnosed: portal-side slowness, or the renewed session
 blocking the portal host.
+
+## Live gateway admin exposure (2026-10-21, 02:01–02:12)
+
+`portallens analyze --authorized` while connected caught the gateway's admin
+surface from the client network:
+
+| Port | State | Service |
+|---|---|---|
+| 23 | **open** (22 ms, Telnet IAC banner) | RouterOS login |
+| 80 / 443 | open (~1.5–2.5 s) | captive portal |
+| 22 | filtered (timeout) | — |
+| 8291 / 8728 / 8729 | filtered (timeout) | WebFig / API |
+| 8080 | refused | — |
+
+`maz.wifi` resolves to `10.111.0.1`. Confirmed independently with a raw socket
+scan, not just the tool's own probe.
+
+### Default-credential audit (new capability, ADR-26)
+
+`--check-default-credentials` tried the three published RouterOS defaults
+against port 23 and recorded `admin_credential:23 = default_rejected`. Verified
+at the prompt: `Login: admin` → `Password:` → `Login failed, incorrect
+username or password`. So the Telnet admin is **exposed but not using a vendor
+default** — the exposure finding stands, the catastrophic one does not.
+
+Telnet admin on the client-facing interface is still worth reporting to the
+operator on its own: RouterOS telnet is cleartext, and the login prompt is
+reachable by every client on the network.

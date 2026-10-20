@@ -269,6 +269,22 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
 - **Consequences:** The primary UX is available now without misrepresenting unsupported network behavior. The next Wi-Fi slice must attach the bounded detector through the generation-guarded session controller, then add redacted event persistence and stop/switch orchestration. Public docs should describe this boundary in user-facing language.
 
 ---
+## ADR-26: Default-credential audit — bounded, opt-in, own risk assessment (2026-10-21)
+- **Status:** accepted — implements the first action beyond detection permitted by ADR-16
+- **Context:** A live assessment of `maz.wifi` found the gateway's Telnet admin port (23, `10.111.0.1`) reachable from the client network, and `gateway_admin_exposed` fired at 65%. Reachability alone leaves the operator's real exposure unknown: the question that matters is whether the admin login still accepts a published vendor default, which on MikroTik is `admin` with a blank password. The user directed: "that is not out of scope build it."
+- **Decision:** Add `portallens.security.credentials.probe_default_credentials` — a **bounded default-credential audit** of an exposed admin login — and expose it as `--check-default-credentials` on `analyze`, `tui`, and `investigate` (off by default). It tries the three published defaults (`admin`/blank, `admin`/`admin`, `admin`/`password`) against a Telnet login the admin-port probe already found reachable, records `admin_credential:<port>` evidence, and raises the `gateway_admin_default_credential` check (CRITICAL).
+- **Risk assessment (the discipline ADR-16 requires):**
+  - **Bounded damage.** At most 3 attempts per host (hard cap 5), a delay between attempts, and an immediate stop on the first accepted login or the first transport failure — a refused/reset socket is treated as a lockout signal, not a reason to retry.
+  - **Bounded credential surface.** Three published vendor defaults, fixed in code. No wordlist, no mutation, no corpus, no third-party session replay (which ADR-19/ADR-20 refused on consent grounds). Nothing captured from another user is used.
+  - **Read-only after login.** The audit reads a prompt and stops. It does not change configuration, open a shell session, or extract data.
+  - **Same single authorization (ADR-15).** `assert_policy` runs first; without `--authorized` the audit raises `AcquisitionDenied` and opens no socket. The operator is responsible for the target, as with every active technique.
+  - **Evidence, not accusations.** An accepted default is recorded as evidence with the credential labelled; a refusal is recorded as negative evidence, so "the default worked" and "the default did not work" are distinguishable later.
+- **Consequences:**
+  - The blanket statement "nothing ever authenticates" is now false for this one opt-in action; `security/bypass.py` probes still never authenticate, and the TUTORIAL/ARCHITECTURE wording is scoped accordingly.
+  - This is the first exploit-class capability in the tool. A future action beyond detection needs its own ADR on the same pattern: bounded surface, hard caps, stop conditions, own risk assessment.
+  - Telnet is the only login transport implemented. HTTP/WebFig (digest auth) and SSH (key exchange) would each need their own bounded implementation and are not promised by this ADR.
+
+---
 ## ADR-25: Preserve rendered Wi-Fi rows during selection and refresh (2026-08-02)
 - **Status:** accepted
 - **Context:** Textual mounts `ListItem` children asynchronously. A selection handler can synchronously publish controller state while Textual is still dispatching `ListView.Selected`; clearing and rebuilding the same list in that callback can crash or leave the list empty. Automatic refresh introduces the same mount race if identical scan results rebuild rows unnecessarily.
