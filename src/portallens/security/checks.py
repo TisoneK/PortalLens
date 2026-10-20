@@ -174,10 +174,41 @@ GATEWAY_ADMIN_EXPOSED = SecurityCheck(
 )
 
 
+POST_EXPIRY_ACCESS = SecurityCheck(
+    slug="post_expiry_access",
+    title="Internet access available after recorded package expiry",
+    severity=Severity.MEDIUM,
+    impact=(
+        "A connectivity probe verified unrestricted internet access at a time "
+        "after the recorded package expiry, with no recorded renewal before "
+        "the sample. On a paid hotspot this means session/billing enforcement "
+        "is not terminating access - e.g. an expired session left active, "
+        "MAC-cookie re-authorization, a free-access or grace profile, or a "
+        "billing-to-router synchronization failure. The operator loses revenue "
+        "and carries abuse surface while this persists."
+    ),
+    remediation=(
+        "On the gateway, invalidate expired hotspot sessions and verify "
+        "MAC-cookie, trial, and free-access profiles are not restoring "
+        "expired accounts; on the billing side, verify expiry is pushed to "
+        "the router and confirmed in the active-session table."
+    ),
+    provenance=Provenance.DOCUMENTED,
+    requires=EvidenceRequirement(
+        types=(EvidenceType.CAPTIVE_PORTAL_STATUS,),
+        keys=("watch:post-expiry-access",),
+        min_matches=1,
+    ),
+    confidence_weights={"watch:post-expiry-access": 80},
+    base_confidence=70,
+)
+
+
 CHECKS: tuple[SecurityCheck, ...] = (
     CLIENT_FINGERPRINTING,
     CLEARTEXT_LOGIN,
     GATEWAY_ADMIN_EXPOSED,
+    POST_EXPIRY_ACCESS,
 )
 
 

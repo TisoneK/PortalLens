@@ -6,6 +6,12 @@ credentials, association, packet operations, browser launch, and bypass
 operations remain outside the implementation boundary. The Textual picker is
 available from :mod:`portallens.wifi.picker` and is intentionally not imported
 here so core imports stay dependency-free.
+
+The :mod:`portallens.wifi.watch` connectivity watch accumulates the bounded
+probe outcomes from :mod:`portallens.wifi.captive_portal` over time and
+connection epochs so a report can flag access that continues (or returns)
+after a recorded package expiry. It introduces no network behavior of its
+own.
 """
 
 from portallens.wifi.adapter import WifiAdapter, ensure_capability
@@ -61,6 +67,19 @@ from portallens.wifi.models import (
     safe_portal_url,
 )
 from portallens.wifi.session import WifiPickerPhase, WifiPickerState, WifiSessionController
+from portallens.wifi.watch import (
+    JOURNAL_VERSION,
+    AccessWatchReport,
+    ConnectivityWatch,
+    WatchBoundary,
+    WatchBoundaryKind,
+    WatchSample,
+    WatchSampleState,
+    WatchTransition,
+    default_watch_journal_path,
+    load_watch_journal,
+    save_watch_journal,
+)
 
 __all__ = [
     "ANDROID_CLIENTS3_GENERATE_204",
@@ -68,9 +87,11 @@ __all__ = [
     "APPLE_HOTSPOT",
     "FIREFOX_CANONICAL",
     "GNOME_NETWORK_STATUS",
+    "JOURNAL_VERSION",
     "PROBE_PROFILES",
     "WINDOWS_CONNECT_TEST",
     "WINDOWS_NCSI",
+    "AccessWatchReport",
     "CancellationToken",
     "CaptivePortalDetector",
     "CaptivePortalMetadata",
@@ -79,9 +100,15 @@ __all__ = [
     "CaptivePortalResponse",
     "CommandResult",
     "CommandRunner",
+    "ConnectivityWatch",
     "LinuxWifiAdapter",
     "MacOSWifiAdapter",
     "SubprocessCommandRunner",
+    "WatchBoundary",
+    "WatchBoundaryKind",
+    "WatchSample",
+    "WatchSampleState",
+    "WatchTransition",
     "WifiAdapter",
     "WifiAdapterCapabilities",
     "WifiAdapterUnavailable",
@@ -103,7 +130,9 @@ __all__ = [
     "adapter_for_platform",
     "analyze_probe_result",
     "apply_probe_result",
+    "default_watch_journal_path",
     "ensure_capability",
+    "load_watch_journal",
     "parse_airport_scan",
     "parse_captive_portal_metadata",
     "parse_netsh_scan",
@@ -113,4 +142,5 @@ __all__ = [
     "parse_nmcli_status",
     "profiles_for_platform",
     "safe_portal_url",
+    "save_watch_journal",
 ]

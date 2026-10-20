@@ -38,8 +38,10 @@ Active analysis — the caller asserts authorization for the target::
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import click
@@ -53,6 +55,8 @@ from portallens.reporting import render_markdown
 
 if TYPE_CHECKING:
     from portallens.tui.setup import SetupResult
+    from portallens.wifi.captive_portal import CaptivePortalDetector
+    from portallens.wifi.watch import AccessWatchReport
 
 # ---------------------------------------------------------------------------
 # Shared analysis helper — both subcommands run the same engine call.
@@ -695,6 +699,219 @@ def step(investigation_id: str, step_slug: str, authorized: bool, db_path: str |
         for ev in evidence:
             echo(f"  [{ev.type.value}] {ev.key}: {ev.value}")
         echo(f"Investigation {investigation.id} updated (audit log appended).")
+
+
+def _watch_detector() -> CaptivePortalDetector:
+    """Build the probe detector for ``portallens watch``.
+
+    A module-level seam so tests can substitute a fake request function
+    instead of reaching the network (same shape used by the detector's own
+    tests).
+    """
+
+    from portallens.wifi.captive_portal import CaptivePortalDetector
+
+    return CaptivePortalDetector()
+
+
+def _watch_boundary_time(value: str) -> datetime:
+    """Parse a user-supplied boundary time; naive input means local time."""
+
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise click.BadParameter(
+            "expected an ISO 8601 time such as 2026-10-20T15:30 or 2026-10-20T15:30:00+03:00"
+        ) from exc
+    if parsed.tzinfo is None:
+        return parsed.astimezone()
+    return parsed
+
+
+def _watch_report_json(report: AccessWatchReport) -> str:
+    """Render a watch report as JSON for scripts."""
+
+    payload = {
+        "target": report.target,
+        "notes": list(report.notes),
+        "boundaries": [
+            {"kind": b.kind.value, "at": b.at.isoformat(), "note": b.note}
+            for b in report.boundaries
+        ],
+        "samples": [
+            {
+                "epoch": s.epoch,
+                "state": s.state.value,
+                "profile_name": s.profile_name,
+                "observed_at": s.observed_at.isoformat(),
+                "portal_url": s.portal_url,
+                "seconds_remaining": s.seconds_remaining,
+                "can_extend_session": s.can_extend_session,
+            }
+            for s in report.samples
+        ],
+        "transitions": [
+            {
+                "from_state": t.from_state.value if t.from_state else None,
+                "to_state": t.to_state.value,
+                "epoch": t.epoch,
+                "observed_at": t.observed_at.isoformat(),
+                "new_epoch": t.new_epoch,
+            }
+            for t in report.transitions
+        ],
+        "findings": [
+            {
+                "check_slug": f.check_slug,
+                "title": f.title,
+                "severity": f.severity.value,
+                "confidence": f.confidence,
+                "verification_status": f.verification_status,
+                "impact": f.impact,
+                "remediation": f.remediation,
+                "evidence_ids": list(f.evidence_ids),
+            }
+            for f in report.findings
+        ],
+        "evidence": [
+            {
+                "id": e.id,
+                "type": e.type.value,
+                "key": e.key,
+                "value": e.value,
+                "note": e.note,
+            }
+            for e in report.evidence
+        ],
+    }
+    return json.dumps(payload, indent=2, default=str)
+
+
+@main.command(name="watch")
+@click.option(
+    "--profile",
+    "profile_name",
+    default="windows-ncsi",
+    show_default=True,
+    help="Connectivity probe profile to run (the same allow-listed profiles captive-portal detection uses).",
+)
+@click.option(
+    "--expiry",
+    "expiry",
+    multiple=True,
+    metavar="ISO8601",
+    help="Record a package-expiry boundary. Repeatable; naive times mean local time.",
+)
+@click.option(
+    "--renewal",
+    "renewal",
+    multiple=True,
+    metavar="ISO8601",
+    help="Record a package-renewal boundary, so access it covers is not flagged.",
+)
+@click.option(
+    "--reconnect",
+    "reconnect",
+    is_flag=True,
+    default=False,
+    help="Assert this sample was taken after reconnecting, opening a new epoch.",
+)
+@click.option("--target", default=None, help="Label for the watched network (e.g. maz.wifi).")
+@click.option(
+    "--journal",
+    "journal_path",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help=(
+        "Observation journal path. Defaults to $PORTALLENS_WATCH, else "
+        "$XDG_DATA_HOME/portallens/watch.json."
+    ),
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["markdown", "json"], case_sensitive=False),
+    default="markdown",
+    show_default=True,
+    help="Output format for the evaluated report.",
+)
+@_AUTHORIZED_OPTION
+def watch(
+    profile_name: str,
+    expiry: tuple[str, ...],
+    renewal: tuple[str, ...],
+    reconnect: bool,
+    target: str | None,
+    journal_path: str | None,
+    output_format: str,
+    authorized: bool,
+) -> None:
+    """Observe access across a package expiry, one run per connection.
+
+    Runs one bounded, read-only connectivity probe, appends the result to a
+    journal, and evaluates everything recorded so far. Each real reconnect
+    is a separate run with ``--reconnect``, which is what lets the report
+    distinguish "still connected" from "reconnected":
+
+        portallens watch --target maz.wifi --expiry 2026-10-20T15:30 --authorized
+        # ... package expires, internet stops, you reconnect ...
+        portallens watch --target maz.wifi --reconnect --authorized
+
+    A finding appears when a probe verified unrestricted access after the
+    recorded expiry with no recorded renewal before it. Billing milestones
+    are your observations: a read-only tool cannot see the billing system,
+    and the report says so.
+    """
+
+    from portallens.wifi.captive_portal import PROBE_PROFILES
+    from portallens.wifi.watch import (
+        WatchBoundaryKind,
+        default_watch_journal_path,
+        load_watch_journal,
+        save_watch_journal,
+    )
+
+    profile = next((p for p in PROBE_PROFILES if p.name == profile_name), None)
+    if profile is None:
+        available = ", ".join(p.name for p in PROBE_PROFILES)
+        echo(f"Unknown probe profile {profile_name!r}. Available: {available}", err=True)
+        sys.exit(2)
+
+    path = journal_path or default_watch_journal_path()
+    try:
+        watched = load_watch_journal(path, target=target)
+    except ValueError as exc:
+        echo(f"Error: {exc}", err=True)
+        sys.exit(2)
+
+    for value in expiry:
+        watched.add_boundary(WatchBoundaryKind.PACKAGE_EXPIRY, at=_watch_boundary_time(value))
+    for value in renewal:
+        watched.add_boundary(WatchBoundaryKind.PACKAGE_RENEWAL, at=_watch_boundary_time(value))
+
+    if reconnect:
+        watched.begin_epoch()
+
+    policy = AcquisitionPolicy(authorized=authorized)
+    detector = _watch_detector()
+    try:
+        result = detector.probe(profile, policy)
+    except AcquisitionDenied as exc:
+        echo(f"Error: {exc}", err=True)
+        echo("Re-run with --authorized, and only against a network you may test.", err=True)
+        sys.exit(2)
+
+    watched.record(result)
+    save_watch_journal(path, watched)
+
+    report = watched.report()
+    if output_format.lower() == "json":
+        echo(_watch_report_json(report))
+    else:
+        from portallens.reporting import render_watch_markdown
+
+        echo(render_watch_markdown(report))
+        echo(f"Journal: {path}", err=True)
 
 
 if __name__ == "__main__":

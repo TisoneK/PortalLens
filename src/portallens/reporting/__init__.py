@@ -9,11 +9,16 @@ this one without changing the report model.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from portallens.confidence import ConfidenceLabel, _label_for
 from portallens.portal import PortalReport, PortalType
 from portallens.reporting.sarif import render_sarif
 
-__all__ = ["render_markdown", "render_sarif"]
+if TYPE_CHECKING:
+    from portallens.wifi.watch import AccessWatchReport
+
+__all__ = ["render_markdown", "render_sarif", "render_watch_markdown"]
 
 _TYPE_LABELS: dict[PortalType, str] = {
     PortalType.CAPTIVE_WIFI: "Captive Wi-Fi Portal",
@@ -199,6 +204,131 @@ def render_markdown(report: PortalReport, *, title: str | None = None) -> str:
         lines.append(f"| {rng} | {lbl.value} | {meaning} |")
     lines.append("")
 
+    return "\n".join(lines)
+
+
+def render_watch_markdown(
+    report: AccessWatchReport,
+    *,
+    title: str | None = None,
+) -> str:
+    """Render a connectivity-watch report as Markdown.
+
+    Kept separate from :func:`render_markdown`: a watch report is about a
+    sequence of observations over time, not about one portal snapshot, so
+    the sections are the history, the transitions, and what follows from
+    them.
+    """
+
+    heading = title or "PortalLens Watch Report - access across a package expiry"
+    sampled_states = {sample.state.value for sample in report.samples}
+
+    lines: list[str] = [f"# {heading}", ""]
+    lines.append(f"**Watched target:** {report.target or '(not labelled)'}")
+    lines.append(f"**Observations:** {len(report.samples)} across {len({s.epoch for s in report.samples})} connection epoch(s)")
+    lines.append(f"**Recorded boundaries:** {len(report.boundaries)}")
+    lines.append("")
+
+    lines.append("## Summary")
+    lines.append("")
+    if report.findings:
+        lines.append(f"- Findings raised: {len(report.findings)}")
+    else:
+        lines.append("- Findings raised: none")
+    if report.samples:
+        lines.append(f"- Observed classifications: {', '.join(sorted(sampled_states))}")
+    else:
+        lines.append("- No observations recorded yet.")
+    post_expiry = [e for e in report.evidence if e.key == "watch:post-expiry-access"]
+    if post_expiry:
+        lines.append(
+            f"- Verified unrestricted samples after a recorded expiry with no "
+            f"recorded renewal: {len(post_expiry)}"
+        )
+    lines.append("")
+
+    lines.append("## Findings")
+    lines.append("")
+    if report.findings:
+        for finding in report.findings:
+            status = f" - {finding.verification_status}" if finding.verification_status else ""
+            lines.append(
+                f"- **[{finding.severity.value} | {finding.confidence}%] {finding.title}**{status}"
+            )
+            lines.append(f"  - Check: `{finding.check_slug}`")
+            if finding.impact:
+                lines.append(f"  - Impact: {finding.impact}")
+            if finding.remediation:
+                lines.append(f"  - Remediation: {finding.remediation}")
+            if finding.evidence_ids:
+                lines.append(f"  - Evidence: {', '.join(finding.evidence_ids)}")
+    else:
+        lines.append("No check fired on the recorded history.")
+    lines.append("")
+
+    lines.append("## Recorded boundaries")
+    lines.append("")
+    if report.boundaries:
+        lines.append("| Kind | At | Note |")
+        lines.append("|---|---|---|")
+        for boundary in report.boundaries:
+            lines.append(
+                f"| {boundary.kind.value} | {boundary.at.isoformat()} | {boundary.note or ''} |"
+            )
+    else:
+        lines.append("None recorded - no expiry is known, so post-expiry access cannot be judged.")
+    lines.append("")
+
+    lines.append("## Observations")
+    lines.append("")
+    if report.samples:
+        lines.append("| # | Epoch | Observed at | Classification | Profile | Portal |")
+        lines.append("|---|---|---|---|---|---|")
+        for index, sample in enumerate(report.samples, start=1):
+            portal = f"`{_redact(sample.portal_url)}`" if sample.portal_url else "-"
+            lines.append(
+                f"| {index} | {sample.epoch} | {sample.observed_at.isoformat()} | "
+                f"{sample.state.value} | {sample.profile_name} | {portal} |"
+            )
+    else:
+        lines.append("No observations recorded yet.")
+    lines.append("")
+
+    changes = [t for t in report.transitions if t.from_state is not None]
+    lines.append("## Transitions")
+    lines.append("")
+    if changes:
+        for transition in changes:
+            assert transition.from_state is not None
+            where = "after a reconnect" if transition.new_epoch else "within one connection"
+            lines.append(
+                f"- {transition.from_state.value} -> {transition.to_state.value} "
+                f"({where}) at {transition.observed_at.isoformat()}"
+            )
+    else:
+        lines.append("No classification changes recorded.")
+    lines.append("")
+
+    lines.append("## Supporting evidence")
+    lines.append("")
+    derived = [e for e in report.evidence if e.key.startswith("watch:")]
+    if derived:
+        lines.append("| ID | Key | Value | Note |")
+        lines.append("|---|---|---|---|")
+        for evidence in derived:
+            note = (evidence.note or "").replace("|", "\\|")
+            lines.append(
+                f"| {evidence.id} | `{evidence.key}` | `{_redact(evidence.value)}` | {note} |"
+            )
+    else:
+        lines.append("No watch-derived evidence yet.")
+    lines.append("")
+
+    lines.append("## How to read this report")
+    lines.append("")
+    for note in report.notes:
+        lines.append(f"- {note}")
+    lines.append("")
     return "\n".join(lines)
 
 

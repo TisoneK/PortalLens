@@ -62,6 +62,7 @@ The setup screen is recommended, but the command line remains available for scri
 | `portallens show ID --audit` | View the investigation activity history |
 | `portallens step ID NAME --authorized` | Run an authorized follow-up step |
 | `portallens wifi` | Open the read-only Wi-Fi picker |
+| `portallens watch --expiry ISO --authorized` | Record connectivity across a package expiry; `--reconnect` after reconnecting |
 
 A URL passed directly to `portallens` is still supported for scripts and continues to produce the traditional report:
 

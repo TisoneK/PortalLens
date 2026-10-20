@@ -446,6 +446,89 @@ report = portal.analyze(
 )
 ```
 
+### Watching access across a package expiry
+
+If you suspect a paid hotspot keeps giving internet after your package
+expires, the connectivity watch compares probe results over time and across
+reconnects, and flags verified access that continues (or returns) after the
+expiry you record. It uses the same bounded, read-only connectivity probes as
+captive-portal detection — it never authenticates, reconnects for you, or
+touches the billing system.
+
+```python
+from portallens.portal import AcquisitionPolicy
+from portallens.wifi import ConnectivityWatch, WatchBoundaryKind
+from portallens.wifi.captive_portal import CaptivePortalDetector, WINDOWS_NCSI
+
+policy = AcquisitionPolicy(authorized=True)
+detector = CaptivePortalDetector()
+watch = ConnectivityWatch(target="maz.wifi")
+
+# While the package is valid:
+watch.record(detector.probe(WINDOWS_NCSI, policy))
+
+# When the package expires, record the boundary (times are your observations):
+watch.add_boundary(WatchBoundaryKind.PACKAGE_EXPIRY)
+
+# After reconnecting (the OS reconnects; PortalLens only watches):
+watch.begin_epoch()
+watch.record(detector.probe(WINDOWS_NCSI, policy))
+
+report = watch.report()
+for finding in report.findings:
+    print(finding.title, finding.confidence)
+```
+
+A `post_expiry_access` finding means a probe received a verified
+unrestricted response after your recorded expiry, with no recorded renewal
+before it. The finding's evidence trail shows exactly which probe outcome
+fired it. If the network reports RFC 8908 session data, a provider-reported
+`seconds-remaining` of zero during unrestricted access is captured as extra
+evidence.
+
+Because a read-only tool cannot see the billing system, the expiry and
+renewal boundaries are your recorded annotations — the report says so, and
+the finding is marked provisional until the check is validated against a
+real capture.
+
+#### Watching from the command line
+
+The same watch is available as `portallens watch`, one run per connection.
+It keeps a journal, so the history survives between runs — which is what
+lets it compare before and after a reconnect.
+
+```bash
+# While the package is still valid, or right after it expires:
+portallens watch --target maz.wifi \
+    --expiry 2026-10-20T15:30 \
+    --authorized
+
+# Package expired, internet stopped. Reconnect to the Wi-Fi yourself, then:
+portallens watch --target maz.wifi --reconnect --authorized
+```
+
+`--expiry` and `--renewal` take ISO 8601 times; a time without an offset is
+read as local time. `--reconnect` says "this sample was taken after
+reconnecting", which is what marks it as a new connection epoch. If the
+package is renewed, record that too — a renewal recorded between the expiry
+and a sample means the access it covers is not flagged:
+
+```bash
+portallens watch --target maz.wifi --renewal 2026-10-20T18:00 --authorized
+```
+
+Each run prints the evaluated report: the observations, the transitions,
+the findings, and the evidence behind them. `--format json` prints the same
+thing for scripts. The journal lives at `$PORTALLENS_WATCH`, else
+`~/.local/share/portallens/watch.json`; `--journal PATH` picks another file.
+A journal is labelled with its target, and a run naming a different target
+is refused rather than mixing two networks' observations.
+
+The watch adds no new network behaviour: each run makes one bounded,
+allow-listed connectivity probe of the same kind captive-portal detection
+already uses. It never authenticates, reconnects for you, or reads the
+billing system. Only run it against a network you may test.
+
 ---
 
 ## 10. Troubleshooting
