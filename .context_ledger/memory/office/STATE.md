@@ -5,7 +5,7 @@ at check-in and at exit. This is a DERIVED VIEW for fast orientation;
 open the file a line points at when your task needs more than the
 line gives you. Full reading order: ledger-schema.md. -->
 
-_Regenerated: 2026-10-20T20:52:50Z_
+_Regenerated: 2026-10-20T21:09:40Z_
 
 ## Standing params
 - **Core:** 2.2.0 (locked, verified 2026-10-20)
@@ -15,19 +15,21 @@ _Regenerated: 2026-10-20T20:52:50Z_
 - Full params: `memory/workflows/active.md`
 
 ## Office — who's in, right now
-(office empty — no live roster rows)
+- **Rhoda** (S001) — Working — Engineer - taking over the post-expiry connectivity watch
 
 ## Current task
-- **24 (2026-10-20)** — completed — migrated the vendored protocol from core 0.5.0 to the Context Ledger 2.2.0, including the `.context/` → `.context_ledger/` … — *idle*
+- **2026-10-20 — Rhoda / model not exposed by the harness** — takeover of the post-expiry connectivity watch: adopt the uncommitted Wi-Fi watch slice left by the session that died at the office close, … — *in-progress*
 
 ## Backlog — High priority (the top of the queue)
-(none)
+| B-2026-10-20-1 | Finish the connectivity watch for post-expiry access (adopt the uncommitted slice already in the worktree: watch module, security check, export, tests, docs) — partial |
+| B-2026-10-20-2 | Wire captive-portal detection into the Wi-Fi session controller with generation guards, cancellation and host-status gating (see ADR-23, ADR-24) |
+| B-2026-10-20-3 | Back-port the two Context Ledger defects to the upstream package: `ledger-sync rename` vs `ledger-guard push-check`, and `migrate`'s missing backfill of collaboration/README.md and workflows/gates.conf (detail in the frozen office-001 flaws log) |
 
-_0 medium, 0 low priority row(s) — see tasks/backlog.md_
+_6 medium, 5 low priority row(s) — see tasks/backlog.md_
 
 ## Logs at a glance — open only if your task touches these
-- flaws/log.md (protocol/.context_ledger friction): 11 entries, last added 2026-10-20
-- inefficiencies/log.md (project code/env friction): 30 entries, last added 2026-08-02
+- flaws/log.md (protocol/.context_ledger friction): 2 entries, last added 2026-10-20
+- inefficiencies/log.md (project code/env friction): 0 entries
 - plans/decisions.md (ADRs in force — respected, not relitigated): 25 entries, last added 2026-08-02
 
 ## Collaboration
