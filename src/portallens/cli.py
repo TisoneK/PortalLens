@@ -850,7 +850,7 @@ def watch(
 
     Runs one bounded, read-only connectivity probe, appends the result to a
     journal, and evaluates everything recorded so far. Each real reconnect
-    is a separate run with ``--reconnect``, which is what lets the report
+    is a separate run with --reconnect, which is what lets the report
     distinguish "still connected" from "reconnected":
 
         portallens watch --target maz.wifi --expiry 2026-10-20T15:30 --authorized
