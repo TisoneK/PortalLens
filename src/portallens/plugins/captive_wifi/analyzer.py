@@ -206,6 +206,32 @@ class CaptiveWifiPortal(Portal):
                 )
             )
 
+        # The hosted platform's path identifiers (hotspot / session / account),
+        # in path order. One segment is often the uppercase hex of printable
+        # ASCII rather than an opaque id — that segment is the account the
+        # portal is serving, so decode it and say so.
+        platform_label = hints.platform.platform if hints.platform else "hosted portal"
+        for index, segment in enumerate(hints.platform_path_ids):
+            decoded = decode_hex_label(segment)
+            out.append(
+                Evidence(
+                    type=EvidenceType.URL_PATH,
+                    source=source,
+                    key="path_label" if decoded else "path_id",
+                    value=decoded or segment,
+                    note=(
+                        f"Path segment {index + 1} of the {platform_label} scheme."
+                        + (
+                            " It is hex-encoded printable ASCII, so this is the "
+                            "account label the portal carries in the URL — not an "
+                            "opaque identifier."
+                            if decoded
+                            else ""
+                        )
+                    ),
+                )
+            )
+
         # Record every query parameter — they're all potential evidence.
         # The fingerprint detector picks the ones it cares about.
         # We redact potentially-sensitive values (canvasFingerprint,
@@ -338,6 +364,22 @@ class CaptiveWifiPortal(Portal):
                     evidence_ids=host_path_evs,
                 )
             )
+
+        # An account label in the path is worth stating in words: it names who
+        # the portal believes it is serving, before any purchase.
+        for ev in evidence:
+            if ev.source == source and ev.key == "path_label":
+                out.append(
+                    Observation(
+                        kind="fact",
+                        statement=(
+                            f"Portal URL carries the account label `{ev.value}` "
+                            "hex-encoded in its path."
+                        ),
+                        confidence=100,
+                        evidence_ids=[ev.id],
+                    )
+                )
 
         # Record redirect facts — link-login / link-orig pointing at
         # an external host.
@@ -533,3 +575,23 @@ def _has_service_reachable(evidence: list[Evidence]) -> bool:
     """True if the evidence already contains an authorized probe result."""
 
     return any(ev.type is EvidenceType.SERVICE_REACHABLE for ev in evidence)
+
+
+def decode_hex_label(segment: str) -> str | None:
+    """Decode a path segment that is the uppercase hex of printable ASCII.
+
+    ISPMan-style portals put the account label in the path this way
+    (``4D415859205052495354`` -> ``MAXY PRIST``). Anything that is not an
+    even-length run of uppercase hex decoding to printable text returns
+    ``None``, so a session UUID is never mistaken for a label.
+    """
+
+    if len(segment) < 4 or len(segment) % 2 or any(c not in "0123456789ABCDEF" for c in segment):
+        return None
+    try:
+        text = bytes.fromhex(segment).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not text.strip() or not all(32 <= ord(c) < 127 for c in text):
+        return None
+    return text

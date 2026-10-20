@@ -85,6 +85,26 @@ class TestEndToEnd:
         assert admin
         assert all("port_scan" in q.resolves_with for q in admin)
 
+    def test_hex_account_label_in_path_is_decoded(self) -> None:
+        # The ISPMan path carries the account label as uppercase hex — the
+        # portal names who it is serving before any purchase.
+        portal = CaptiveWifiPortal()
+        report = portal.analyze(AnalysisContext(urls=[ISPMAN_URL]))
+        labels = [e for e in report.evidence if e.key == "path_label"]
+        # The fixture's segment is 4D415959... = "MAYY PRIST" (the live URL
+        # captured later reads 4D415859... = "MAXY PRIST").
+        assert labels and labels[0].value == "MAYY PRIST"
+        assert any(
+            "account label" in o.statement for o in report.observations_of_kind("fact")
+        )
+
+    def test_path_ids_are_not_mistaken_for_labels(self) -> None:
+        from portallens.plugins.captive_wifi.analyzer import decode_hex_label
+
+        assert decode_hex_label("366ba450-bc93-4970-97d6-0585aa985a12") is None
+        assert decode_hex_label("4D415859205052495354") == "MAXY PRIST"
+        assert decode_hex_label("00000000") is None
+
     def test_markdown_render_includes_all_sections(self) -> None:
         portal = CaptiveWifiPortal()
         report = portal.analyze(AnalysisContext(urls=[ISPMAN_URL, MAZ_URL]))
