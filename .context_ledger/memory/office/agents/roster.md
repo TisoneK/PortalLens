@@ -52,6 +52,7 @@ is your stable session tag.
 
 | Name | Codename | Model | Doing | Status | Status detail |
 |------|----------|-------|-------|--------|---------------|
+| Rhoda | S001 | unknown (Buffy agent; exact model id not exposed) | Engineer - portal/gateway state consistency work | Working | Checking back in: adding portal-claim observation to the watch |
 
 **Keep your Status cells current — that is what the board is for.** The
 next live worker reads it to know at a glance what a peer has finished,
