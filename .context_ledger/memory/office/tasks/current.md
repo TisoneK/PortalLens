@@ -1,9 +1,11 @@
 # Current Task (overwrite each session)
 
-Holds exactly one task — the one being worked on right now. Set at
-session start (protocol Step 3), clear at session end (Step 15). If a
-prior session died mid-task, check its session entry and backlog first.
+Holds exactly one task — the one being worked on right now. Set it at
+session start (protocol Step 3), clear it at session end (Step 15). If
+you find a stale in-progress entry here, a prior session died mid-task —
+its roster row (if left behind) says who was here; check the session
+entry and backlog before starting.
 
-- **Session:** 24 (2026-10-20)
-- **Task:** completed — migrated the vendored protocol from core 0.5.0 to the Context Ledger 2.2.0, including the `.context/` → `.context_ledger/` rename, the office layout, gates and guard hooks.
-- **Status:** idle
+- **Session:** 2026-10-20 — Rhoda / model not exposed by the harness
+- **Task:** takeover of the post-expiry connectivity watch: adopt the uncommitted Wi-Fi watch slice left by the session that died at the office close, verify what it does, and continue it to a finished, tested surface
+- **Status:** in-progress
