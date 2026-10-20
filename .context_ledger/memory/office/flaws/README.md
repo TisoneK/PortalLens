@@ -18,10 +18,10 @@ goes in `../inefficiencies/log.md` — **not here**. The split:
 This file is the **source of truth** inside this project. Periodically —
 or when a pattern repeats across sessions — the flaws here are
 back-ported to the protocol package (the "Package upstream" URL in
-`../workflows/active.md` — the repo that `core/` is vendored from). The
+`../../workflows/active.md` — the repo that `core/` is vendored from). The
 package fix might be: a new pitfall, a reworded step, a new template
 field, a schema change, or a new core release. It reaches this project
-on the next `context-sync update`.
+on the next `ledger-sync update`.
 
 When a flaw is fixed in the package, append a "Fixed in package" line
 to the entry here — don't delete the original. The history of what was
@@ -35,7 +35,7 @@ Every repo managed by this protocol has **two surfaces**:
 1. **The project** — product code, docs, tests, config. Commits use
    normal prefixes (`fix:`, `feat:`, `docs:`). Friction with the project
    goes in `inefficiencies/log.md`.
-2. **`.context_ledger/`** — agent memory. Commits use `chore(context):`. Friction
+2. **`.context_ledger/`** — agent memory. Commits use `chore(ledger):`. Friction
    with the `.context_ledger/` system or the protocol goes in `flaws/log.md`
    (this file).
 

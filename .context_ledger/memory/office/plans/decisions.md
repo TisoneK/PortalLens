@@ -3,7 +3,6 @@
 Decisions already made — future agents respect these rather than
 relitigating them. To reverse one, append a new ADR that supersedes it.
 
----
 ## ADR-1: Passive by default — active analysis requires explicit authorization (2026-07-23)
 - **Status:** accepted
 - **Context:** PortalLens's value proposition is calibrated, evidence-backed analysis. Active probing (HTTP fetching, DNS resolution, port scanning) of networks the user doesn't own is unauthorized scanning in most jurisdictions. The user explicitly stated in the design conversation: "don't actively scan or probe networks without authorization."
