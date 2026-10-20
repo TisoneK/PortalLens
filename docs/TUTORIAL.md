@@ -335,6 +335,24 @@ SSH, Telnet) that can fire the `gateway_admin_exposed` security finding.
 OSINT lookups (RIPEstat) run as `portallens step <id> ip_asn_lookup`
 against a persisted investigation rather than inline.
 
+### Checking an exposed admin login for default credentials
+
+A reachable admin port is a door; whether it is locked is a separate
+question. Add `--check-default-credentials` to test it:
+
+```bash
+portallens analyze --authorized --check-default-credentials \
+  "http://maz.wifi/login?dst=http%3A%2F%2Fwww.msftconnecttest.com%2Fredirect"
+```
+
+The audit only runs when the port probe found the Telnet login reachable.
+It tries three published vendor defaults (`admin`/blank, `admin`/admin,
+`admin`/password), one at a time with a pause, and stops at the first
+accepted login or the first transport failure. An accepted default raises
+`gateway_admin_default_credential` (critical); a refusal is recorded as
+negative evidence, so you can tell "the default worked" from "the default
+was refused" later. See ADR-26 for the risk assessment.
+
 > **You are responsible for targets you authorize.** `--authorized` is
 > an assertion, not a verification — the tool cannot check that you own
 > the network. See [section 11](#11-responsible-use).
@@ -607,6 +625,8 @@ port scanning, OSINT, bypass probes) — and it is your assertion, not a
 verification. Passive analysis (URL parsing, no network access) is always
 safe and is the default.
 
-PortalLens does not bypass authentication, and its bypass probes never
-submit credentials or attempt to obtain access. Bypass findings are
-"potential" by design and require independent verification.
+The bypass probes never submit credentials or attempt to obtain access.
+The one action that does authenticate is the opt-in default-credential
+audit above (`--check-default-credentials`, ADR-26), limited to three
+published vendor defaults. Bypass findings are "potential" by design and
+require independent verification.

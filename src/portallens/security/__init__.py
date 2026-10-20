@@ -10,6 +10,8 @@
   CONNECT, DNS, click-through, port reachability, and parameter tampering.
 - :mod:`portallens.security.bypass_detection` — report-level findings from
   positive bypass evidence; it never performs the probes itself.
+- :mod:`portallens.security.credentials` — the bounded, gated default-credential
+  audit for an exposed admin login (ADR-26).
 
 Findings may be lightweight (ADR-17): check, title, severity, and confidence
 are required; Impact, Affected asset, Evidence, Remediation, and Verification
@@ -36,12 +38,21 @@ from portallens.security.checks import (
     check_for_slug,
     run_checks,
 )
+from portallens.security.credentials import (
+    DEFAULT_CREDENTIALS,
+    MAX_CREDENTIAL_ATTEMPTS,
+    CredentialAttempt,
+    probe_default_credentials,
+)
 from portallens.security.findings import SecurityFinding, Severity
 
 __all__ = [
     "CHECKS",
     "DEFAULT_BYPASS_PORTS",
+    "DEFAULT_CREDENTIALS",
+    "MAX_CREDENTIAL_ATTEMPTS",
     "ConnectResult",
+    "CredentialAttempt",
     "EvidenceRequirement",
     "ProbeResponse",
     "SecurityCheck",
@@ -55,5 +66,6 @@ __all__ = [
     "merge_bypass_evidence",
     "parameter_tampering_test",
     "port_scan_test",
+    "probe_default_credentials",
     "run_checks",
 ]

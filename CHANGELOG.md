@@ -6,6 +6,7 @@ All notable changes to PortalLens are listed here in plain language.
 
 ### Added
 
+- **Checking whether an exposed admin login still uses a default password.** When an authorized assessment finds a gateway's administrative login reachable, `--check-default-credentials` tests a short list of published vendor defaults (three, one at a time, stopping at the first success) and raises a critical finding if one is accepted. It only runs with `--authorized`, never leaves the login prompt, and records a refusal as evidence too, so an unlocked door and a locked one read differently later.
 - **A new starting screen.** Running `portallens` now opens the main setup screen instead of printing help. Users can choose investigation options, scan for nearby Wi-Fi networks, select a target, and press **Start investigation**. Wi-Fi-only sessions are clearly labelled as read-only host monitoring.
 - **Clear investigation choices.** The setup screen explains passive mode, authorized active checks, automatic follow-up steps, and monitoring before the session starts.
 - **Read-only Wi-Fi target monitoring.** After selecting a network and enabling monitoring, PortalLens can show the connection status reported by your computer without entering credentials, changing the Wi-Fi connection, opening a browser, or submitting anything to the network.

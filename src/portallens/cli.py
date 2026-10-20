@@ -71,6 +71,7 @@ def _run_analysis(
     portal_type: str,
     authorized: bool,
     notes: str | None,
+    credential_audit: bool = False,
 ) -> PortalReport:
     """Run analysis and return the :class:`PortalReport`.
 
@@ -107,7 +108,7 @@ def _run_analysis(
     # is NOT part of this pass — it runs as a `portallens step` against a
     # persisted investigation, per ADR-9.
     if authorized:
-        report = _run_netaudit(report, policy)
+        report = _run_netaudit(report, policy, credential_audit=credential_audit)
     return report
 
 
@@ -133,6 +134,17 @@ _AUTHORIZED_OPTION = click.option(
         "Enable ALL active techniques (HTTP fetching, DNS resolution, "
         "admin-port probing, OSINT lookups). ADR-15: one flag unlocks "
         "every active technique. Passive is the default."
+    ),
+)
+_CREDENTIAL_AUDIT_OPTION = click.option(
+    "--check-default-credentials",
+    "credential_audit",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also try a short list of published vendor default logins against an "
+        "exposed admin login (Telnet 23). Requires --authorized; capped at 3 "
+        "attempts and stopped at the first accepted login. ADR-26."
     ),
 )
 _NOTES_OPTION = click.option(
@@ -254,7 +266,12 @@ def _start_from_setup(result: SetupResult) -> None:
     )
 
 
-def _run_netaudit(report: PortalReport, policy: AcquisitionPolicy) -> PortalReport:
+def _run_netaudit(
+    report: PortalReport,
+    policy: AcquisitionPolicy,
+    *,
+    credential_audit: bool = False,
+) -> PortalReport:
     """Run the authorized active-assessment pass and merge its results.
 
     Only runs when the policy enables an active technique NetAudit knows
@@ -268,7 +285,7 @@ def _run_netaudit(report: PortalReport, policy: AcquisitionPolicy) -> PortalRepo
     hosts = hosts_from_report(report)
     if not hosts:
         return report
-    result = run_netaudit(hosts, policy)
+    result = run_netaudit(hosts, policy, credential_audit=credential_audit)
     if not result.evidence and not result.findings:
         return report
 
@@ -351,6 +368,7 @@ def main(ctx: click.Context) -> None:
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
 @_AUTHORIZED_OPTION
+@_CREDENTIAL_AUDIT_OPTION
 @_NOTES_OPTION
 @_FORMAT_OPTION
 @click.option(
@@ -365,6 +383,7 @@ def analyze(
     urls: tuple[str, ...],
     portal_type: str,
     authorized: bool,
+    credential_audit: bool,
     output: str | None,
     output_format: str,
     notes: str | None,
@@ -376,6 +395,7 @@ def analyze(
         portal_type=portal_type,
         authorized=authorized,
         notes=notes,
+        credential_audit=credential_audit,
     )
     rendered = _render(report, output_format)
 
@@ -392,6 +412,7 @@ def analyze(
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
 @_AUTHORIZED_OPTION
+@_CREDENTIAL_AUDIT_OPTION
 @_NOTES_OPTION
 @_DB_OPTION
 @click.option(
@@ -419,6 +440,7 @@ def tui(
     urls: tuple[str, ...],
     portal_type: str,
     authorized: bool,
+    credential_audit: bool,
     notes: str | None,
     db_path: str | None,
     auto_start: bool,
@@ -435,6 +457,7 @@ def tui(
         portal_type=portal_type,
         authorized=authorized,
         notes=notes,
+        credential_audit=credential_audit,
     )
 
     # Lazy import — keeps textual out of the core library's import graph
@@ -538,12 +561,14 @@ def wifi(platform_name: str | None, interface: str | None) -> None:
 @click.argument("urls", nargs=-1, required=True)
 @_PORTAL_TYPE_OPTION
 @_AUTHORIZED_OPTION
+@_CREDENTIAL_AUDIT_OPTION
 @_NOTES_OPTION
 @_DB_OPTION
 def investigate(
     urls: tuple[str, ...],
     portal_type: str,
     authorized: bool,
+    credential_audit: bool,
     notes: str | None,
     db_path: str | None,
 ) -> None:
@@ -560,6 +585,7 @@ def investigate(
         portal_type=portal_type,
         authorized=authorized,
         notes=notes,
+        credential_audit=credential_audit,
     )
     investigation = Investigation.start(
         report,

@@ -11,10 +11,12 @@ probe results.
 The probe function takes an injectable ``probe_port`` callable so tests can
 exercise the logic without touching the network; the default uses ``socket``.
 
-The probes only *detect* that a service is reachable — no exploit action
-(authenticating, submitting credentials, bypassing) is implemented (ADR-16
-lifted the assess-only ban at the records level, but nothing beyond
-detection has been built).
+The port probes only *detect* that a service is reachable. One action beyond
+detection exists, and only when the caller asks for it: a bounded
+**default-credential audit** of an exposed admin login
+(:mod:`portallens.security.credentials`), which ADR-26 assesses and records.
+It is off by default, capped at three attempts, and gated behind the same
+single authorization flag (ADR-15).
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from portallens.acquisition import assert_policy
 from portallens.evidence import Evidence, EvidenceType
 from portallens.portal import AcquisitionPolicy, SecurityFinding
 from portallens.security.checks import run_checks
+from portallens.security.credentials import probe_default_credentials
 
 #: Well-known administrative ports for the gateways the captive_wifi plugin
 #: recognizes. The value is the service label that lands in evidence.
@@ -94,17 +97,40 @@ def run_netaudit(
     policy: AcquisitionPolicy,
     *,
     probe_port: Callable[[str, int], bool] | None = None,
+    credential_audit: bool = False,
+    credential_port: int = 23,
+    credential_login: Callable[[str, int, str, str, float], bool] | None = None,
 ) -> AuditResult:
     """Run the authorized active-assessment pass over ``hosts``.
 
-    Currently one technique is implemented — admin-port probing
-    (``port_scan``). The pass always re-runs the SecurityCheck registry over
-    the probe evidence so findings fire on what the probe actually saw.
+    Two techniques are implemented: admin-port probing (``port_scan``), and —
+    only when ``credential_audit`` is set — a bounded default-credential
+    audit of an admin login the port probe found reachable. The pass always
+    re-runs the SecurityCheck registry over the probe evidence so findings
+    fire on what the probe actually saw.
     """
 
     evidence: list[Evidence] = []
     if policy.authorized:
-        evidence.extend(probe_admin_ports(hosts, policy, probe_port=probe_port))
+        port_evidence = probe_admin_ports(hosts, policy, probe_port=probe_port)
+        evidence.extend(port_evidence)
+        if credential_audit:
+            reachable = {
+                ev.source
+                for ev in port_evidence
+                if ev.key == f"admin_port:{credential_port}"
+            }
+            for host in hosts:
+                if f"port_scan://{host}:{credential_port}" not in reachable:
+                    continue
+                evidence.extend(
+                    probe_default_credentials(
+                        host,
+                        policy,
+                        port=credential_port,
+                        login=credential_login,
+                    )
+                )
     findings = run_checks(evidence)
     return AuditResult(evidence=evidence, findings=findings)
 

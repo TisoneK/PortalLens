@@ -174,6 +174,33 @@ GATEWAY_ADMIN_EXPOSED = SecurityCheck(
 )
 
 
+GATEWAY_DEFAULT_CREDENTIAL = SecurityCheck(
+    slug="gateway_admin_default_credential",
+    title="Gateway administrative login accepts a well-known default credential",
+    severity=Severity.CRITICAL,
+    impact=(
+        "An administrative service on the gateway accepted a published vendor "
+        "default login from the client network. Anyone on the network can log "
+        "in as administrator, change hotspot and firewall configuration, read "
+        "session and billing records, and monitor or redirect client traffic."
+    ),
+    remediation=(
+        "Set a unique administrative password, disable Telnet on the "
+        "client-facing interface, and restrict administrative services to a "
+        "management VLAN or trusted source addresses."
+    ),
+    provenance=Provenance.DOCUMENTED,
+    requires=EvidenceRequirement(
+        types=(EvidenceType.SERVICE_REACHABLE,),
+        key_prefixes=("admin_credential:",),
+        value_contains=("default_accepted",),
+        min_matches=1,
+    ),
+    confidence_weights={"admin_credential:23": 95},
+    base_confidence=90,
+)
+
+
 POST_EXPIRY_ACCESS = SecurityCheck(
     slug="post_expiry_access",
     title="Internet access available after recorded package expiry",
@@ -242,6 +269,7 @@ CHECKS: tuple[SecurityCheck, ...] = (
     CLIENT_FINGERPRINTING,
     CLEARTEXT_LOGIN,
     GATEWAY_ADMIN_EXPOSED,
+    GATEWAY_DEFAULT_CREDENTIAL,
     PORTAL_CLAIM_MISMATCH,
     POST_EXPIRY_ACCESS,
 )

@@ -165,7 +165,9 @@ The PortalLens design conversation identified three components:
 - **PortalLens** — passive portal intelligence. *(Implemented here.)*
 - **Investigation-console TUI** — interactive presentation layer. *(Implemented — see "TUI" below.)*
 - **Investigation persistence** — a durable, queryable record of each investigation. *(Implemented — see "Investigation persistence" below.)*
-- **NetAudit** — authorized active security assessment. *(Implemented — admin-port assessment in `security/audit.py`; bypass probes are a separate bounded surface in `security/bypass.py`.)*
+- **NetAudit** — authorized active security assessment. *(Implemented — admin-port assessment in `security/audit.py`, plus an opt-in bounded default-credential audit in `security/credentials.py`; bypass probes are a separate bounded surface in `security/bypass.py`.)*
+
+The default-credential audit is the one NetAudit action past detection (ADR-26). It runs only when `--check-default-credentials` is passed *and* the admin-port probe found the login reachable; it tries three published vendor defaults, stops at the first accepted login or the first transport failure, and records `admin_credential:<port>` evidence. `gateway_admin_exposed` says a door is unlocked; `gateway_admin_default_credential` says the key is still under the mat.
 - **DisclosureDesk** — responsible disclosure report generation + tracking. *(Planned — extends `reporting/` with SARIF + disclosure-tracking output; builds on the investigation store below.)*
 
 The `Portal` abstraction is broad enough that NetAudit can be implemented as another plugin (`PortalType.CAPTIVE_WIFI` analyzer with active policy enabled), rather than a separate product. DisclosureDesk is a reporting concern, not an analysis concern — it lives alongside `render_markdown` in `reporting/`.
