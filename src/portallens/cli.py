@@ -701,6 +701,11 @@ def step(investigation_id: str, step_slug: str, authorized: bool, db_path: str |
         echo(f"Investigation {investigation.id} updated (audit log appended).")
 
 
+#: Accepted ``--portal`` claims. Mirrors the PortalClaim enum values; kept as
+#: literals so the CLI does not import the Wi-Fi package at module load.
+_WATCH_PORTAL_CLAIMS = ("purchase_required", "login_required", "active_session", "unknown")
+
+
 def _watch_detector() -> CaptivePortalDetector:
     """Build the probe detector for ``portallens watch``.
 
@@ -816,6 +821,22 @@ def _watch_report_json(report: AccessWatchReport) -> str:
     default=False,
     help="Assert this sample was taken after reconnecting, opening a new epoch.",
 )
+@click.option(
+    "--portal",
+    "portal_claim",
+    type=click.Choice(_WATCH_PORTAL_CLAIMS),
+    default=None,
+    help=(
+        "What the portal showed you at this observation. Recorded, not fetched: "
+        "requesting the portal can itself reset the session."
+    ),
+)
+@click.option(
+    "--note",
+    "observation_note",
+    default=None,
+    help="Free-text note for this observation (e.g. 'tethered laptop opened the portal').",
+)
 @click.option("--target", default=None, help="Label for the watched network (e.g. maz.wifi).")
 @click.option(
     "--journal",
@@ -841,6 +862,8 @@ def watch(
     expiry: tuple[str, ...],
     renewal: tuple[str, ...],
     reconnect: bool,
+    portal_claim: str | None,
+    observation_note: str | None,
     target: str | None,
     journal_path: str | None,
     output_format: str,
@@ -865,6 +888,7 @@ def watch(
 
     from portallens.wifi.captive_portal import PROBE_PROFILES
     from portallens.wifi.watch import (
+        PortalClaim,
         WatchBoundaryKind,
         default_watch_journal_path,
         load_watch_journal,
@@ -901,7 +925,11 @@ def watch(
         echo("Re-run with --authorized, and only against a network you may test.", err=True)
         sys.exit(2)
 
-    watched.record(result)
+    watched.record(
+        result,
+        portal_claim=PortalClaim(portal_claim) if portal_claim else None,
+        note=observation_note,
+    )
     save_watch_journal(path, watched)
 
     report = watched.report()

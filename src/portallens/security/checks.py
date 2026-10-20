@@ -204,10 +204,45 @@ POST_EXPIRY_ACCESS = SecurityCheck(
 )
 
 
+PORTAL_CLAIM_MISMATCH = SecurityCheck(
+    slug="portal_claim_mismatch",
+    title="Portal shows no package while internet access is verified",
+    severity=Severity.MEDIUM,
+    impact=(
+        "At the same moment, a connectivity probe verified unrestricted internet "
+        "access and the portal told the user to buy a package (or log in). The "
+        "portal's view of the account and the gateway's authorization disagree, "
+        "so the user is being asked to pay for access they already have - and an "
+        "account with no valid package can still be passing traffic. Typical "
+        "causes are a portal session lookup that does not match the gateway's "
+        "active sessions (MAC cookie, ip-binding, or an accounting record the "
+        "portal cannot see), or an unauthenticated portal request from behind a "
+        "shared/NATed connection resetting the visible session while the "
+        "authorization survives."
+    ),
+    remediation=(
+        "Reconcile the portal's session lookup with the gateway's active-session "
+        "and accounting tables for the same MAC and IP; decide whether an "
+        "unauthenticated portal request from a NATed device should invalidate an "
+        "existing session (usually it should not); and verify that a device "
+        "holding no package never appears in the active-session table."
+    ),
+    provenance=Provenance.DOCUMENTED,
+    requires=EvidenceRequirement(
+        types=(EvidenceType.CAPTIVE_PORTAL_STATUS,),
+        keys=("watch:portal-claim-mismatch",),
+        min_matches=1,
+    ),
+    confidence_weights={"watch:portal-claim-mismatch": 78},
+    base_confidence=72,
+)
+
+
 CHECKS: tuple[SecurityCheck, ...] = (
     CLIENT_FINGERPRINTING,
     CLEARTEXT_LOGIN,
     GATEWAY_ADMIN_EXPOSED,
+    PORTAL_CLAIM_MISMATCH,
     POST_EXPIRY_ACCESS,
 )
 

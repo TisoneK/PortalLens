@@ -11,6 +11,7 @@ from portallens.wifi.captive_portal import CaptivePortalMetadata, CaptivePortalP
 from portallens.wifi.watch import (
     AccessWatchReport,
     ConnectivityWatch,
+    PortalClaim,
     WatchBoundary,
     WatchBoundaryKind,
     WatchSample,
@@ -280,3 +281,85 @@ class TestReportShape:
 
     def test_report_type_exports(self) -> None:
         assert AccessWatchReport is not None
+
+
+class TestPortalClaim:
+    def test_claim_is_recorded_on_the_sample(self) -> None:
+        watch = ConnectivityWatch()
+        sample = watch.record(_result(False), at=T0, portal_claim=PortalClaim.PURCHASE_REQUIRED)
+        assert sample.portal_claim is PortalClaim.PURCHASE_REQUIRED
+
+    def test_claim_accepts_its_string_value(self) -> None:
+        watch = ConnectivityWatch()
+        sample = watch.record(_result(False), at=T0, portal_claim="login_required")  # type: ignore[arg-type]
+        assert sample.portal_claim is PortalClaim.LOGIN_REQUIRED
+
+    def test_online_while_portal_asks_to_purchase_is_the_mismatch(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch(target="maz.wifi")
+        watch.record(
+            _result(False),
+            at=T0,
+            portal_claim=PortalClaim.PURCHASE_REQUIRED,
+            note="tethered laptop opened the portal",
+        )
+        report = watch.report()
+        matches = [e for e in report.evidence if e.key == "watch:portal-claim-mismatch"]
+        assert len(matches) == 1
+        assert matches[0].value == "purchase_required"
+        (finding,) = report.findings
+        assert finding.check_slug == "portal_claim_mismatch"
+        assert finding.severity.value == "medium"
+        assert finding.confidence == 78
+
+    def test_login_page_while_online_is_also_a_mismatch(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, portal_claim=PortalClaim.LOGIN_REQUIRED)
+        report = watch.report()
+        assert any(e.key == "watch:portal-claim-mismatch" for e in report.evidence)
+
+    def test_active_session_claim_is_consistent(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, portal_claim=PortalClaim.ACTIVE_SESSION)
+        report = watch.report()
+        assert not any(e.key == "watch:portal-claim-mismatch" for e in report.evidence)
+        assert report.findings == ()
+
+    def test_claim_on_a_captive_sample_is_consistent(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(_result(True), at=T0, portal_claim=PortalClaim.PURCHASE_REQUIRED)
+        report = watch.report()
+        assert not any(e.key == "watch:portal-claim-mismatch" for e in report.evidence)
+
+    def test_mismatch_needs_no_expiry_boundary(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, portal_claim=PortalClaim.PURCHASE_REQUIRED)
+        report = watch.report()
+        assert [f.check_slug for f in report.findings] == ["portal_claim_mismatch"]
+
+    def test_journal_roundtrips_claim_and_note(self) -> None:
+        watch = ConnectivityWatch(target="maz.wifi")
+        watch.record(
+            _result(False),
+            at=T0,
+            portal_claim=PortalClaim.PURCHASE_REQUIRED,
+            note="after the other device opened the portal",
+        )
+        rebuilt = ConnectivityWatch.from_journal(watch.to_journal())
+        sample = rebuilt.samples[0]
+        assert sample.portal_claim is PortalClaim.PURCHASE_REQUIRED
+        assert sample.note == "after the other device opened the portal"
+
+    def test_old_journal_without_claims_still_loads(self) -> None:
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0)
+        payload = watch.to_journal()
+        for sample in payload["samples"]:  # type: ignore[union-attr]
+            sample.pop("portal_claim", None)
+            sample.pop("note", None)
+        rebuilt = ConnectivityWatch.from_journal(payload)
+        assert rebuilt.samples[0].portal_claim is None

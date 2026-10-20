@@ -524,6 +524,32 @@ thing for scripts. The journal lives at `$PORTALLENS_WATCH`, else
 A journal is labelled with its target, and a run naming a different target
 is refused rather than mixing two networks' observations.
 
+#### Recording what the portal claims
+
+A hotspot can authorize traffic while its portal insists you have no
+package — the user is told to buy access they already have. That
+contradiction is only visible if both halves are recorded, so `watch`
+takes the portal's claim as an observation of yours:
+
+```bash
+portallens watch --target maz.wifi \
+    --portal purchase_required \
+    --note "reconnect showed the packages page" \
+    --authorized
+```
+
+Accepted claims are `purchase_required`, `login_required`,
+`active_session` and `unknown`. When a sample verifies internet access
+while the portal claimed no package (or demanded a login), the report
+raises `portal_claim_mismatch` — the portal's view of the account and the
+gateway's authorization disagree.
+
+PortalLens does not fetch the portal to check this itself, and that is
+deliberate: on some installations *any* unauthenticated request to the
+portal resets the session, including a request from a second device
+sharing the connection through the same device. Probing it would change
+the thing being measured.
+
 The watch adds no new network behaviour: each run makes one bounded,
 allow-listed connectivity probe of the same kind captive-portal detection
 already uses. It never authenticates, reconnects for you, or reads the

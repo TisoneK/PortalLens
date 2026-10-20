@@ -55,6 +55,20 @@ class WatchSampleState(str, Enum):
     ERROR = "error"                # the probe itself failed
 
 
+class PortalClaim(str, Enum):
+    """What the portal itself claimed when the user last looked at it.
+
+    Recorded rather than probed: fetching the portal while measuring can be
+    the very request that resets the hotspot session, so the observation is
+    the user's, and the report says which claim came from where.
+    """
+
+    PURCHASE_REQUIRED = "purchase_required"
+    LOGIN_REQUIRED = "login_required"
+    ACTIVE_SESSION = "active_session"
+    UNKNOWN = "unknown"
+
+
 class WatchBoundaryKind(str, Enum):
     """A user-recorded billing milestone used to interpret samples."""
 
@@ -94,10 +108,14 @@ class WatchSample:
     seconds_remaining: int | float | None = None
     can_extend_session: bool | None = None
     evidence: tuple[Evidence, ...] = ()
+    portal_claim: PortalClaim | None = None
+    note: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.state, WatchSampleState):
             object.__setattr__(self, "state", WatchSampleState(str(self.state)))
+        if self.portal_claim is not None and not isinstance(self.portal_claim, PortalClaim):
+            object.__setattr__(self, "portal_claim", PortalClaim(str(self.portal_claim)))
         if self.observed_at.tzinfo is None:
             raise ValueError("sample time must be timezone-aware")
         if self.epoch < 0:
@@ -128,6 +146,10 @@ class WatchTransition:
 _POST_EXPIRY_EVIDENCE_KEY = "watch:post-expiry-access"
 _EXPIRED_SESSION_EVIDENCE_KEY = "watch:expired-session-reported"
 _TRANSITION_EVIDENCE_KEY = "watch:state-transition"
+_PORTAL_MISMATCH_EVIDENCE_KEY = "watch:portal-claim-mismatch"
+
+#: Claims that contradict verified internet access.
+_NO_PACKAGE_CLAIMS = frozenset({PortalClaim.PURCHASE_REQUIRED, PortalClaim.LOGIN_REQUIRED})
 
 
 @dataclass(frozen=True)
@@ -218,6 +240,8 @@ class ConnectivityWatch:
         result: CaptivePortalProbeResult,
         *,
         at: datetime | None = None,
+        portal_claim: PortalClaim | None = None,
+        note: str | None = None,
     ) -> WatchSample:
         """Fold one bounded probe result into the watched history."""
 
@@ -231,6 +255,8 @@ class ConnectivityWatch:
             seconds_remaining=metadata.seconds_remaining if metadata else None,
             can_extend_session=metadata.can_extend_session if metadata else None,
             evidence=result.evidence,
+            portal_claim=portal_claim,
+            note=note,
         )
         self._samples.append(sample)
         return sample
@@ -242,6 +268,7 @@ class ConnectivityWatch:
         evidence = list(_transition_evidence(transitions, self._target))
         evidence.extend(_post_expiry_evidence(self._samples, self._boundaries, self._target))
         evidence.extend(_expired_session_evidence(self._samples, self._target))
+        evidence.extend(_portal_claim_mismatch_evidence(self._samples, self._target))
         findings = run_checks(evidence)
         notes = [
             "Billing milestones are user-recorded annotations: a read-only "
@@ -286,6 +313,8 @@ class ConnectivityWatch:
                     "portal_url": s.portal_url,
                     "seconds_remaining": s.seconds_remaining,
                     "can_extend_session": s.can_extend_session,
+                    "portal_claim": s.portal_claim.value if s.portal_claim else None,
+                    "note": s.note,
                 }
                 for s in self._samples
             ],
@@ -347,6 +376,8 @@ class ConnectivityWatch:
                     portal_url=_optional_str(item.get("portal_url"), "portal_url"),
                     seconds_remaining=_optional_number(item.get("seconds_remaining")),
                     can_extend_session=_optional_bool_value(item.get("can_extend_session")),
+                    portal_claim=_portal_claim_value(item.get("portal_claim")),
+                    note=_optional_str(item.get("note"), "note"),
                 )
             )
         return watch
@@ -433,6 +464,41 @@ def _post_expiry_evidence(
                     "Verified unrestricted internet access after the recorded "
                     f"package expiry at {latest_expiry.at.isoformat()}, with no "
                     "recorded renewal before this sample."
+                ),
+                observed_at=sample.observed_at,
+            )
+        )
+    return tuple(evidence)
+
+
+def _portal_claim_mismatch_evidence(
+    samples: list[WatchSample],
+    target: str | None,
+) -> tuple[Evidence, ...]:
+    """Flag samples where the portal denied a package while access worked.
+
+    This is the signature the tool could not previously see: the gateway
+    authorizes traffic and the portal tells the user to buy, in the same
+    moment. It is recorded from the user's observation, not from a probe,
+    because requesting the portal can itself reset the session.
+    """
+
+    evidence: list[Evidence] = []
+    for sample in samples:
+        if sample.state is not WatchSampleState.UNRESTRICTED:
+            continue
+        if sample.portal_claim not in _NO_PACKAGE_CLAIMS:
+            continue
+        claim = sample.portal_claim.value
+        evidence.append(
+            _watch_evidence(
+                target,
+                _PORTAL_MISMATCH_EVIDENCE_KEY,
+                claim,
+                (
+                    "Internet access was verified while the portal showed "
+                    f"{claim.replace('_', ' ')} - the portal's view of the package "
+                    "and the gateway's authorization disagree."
                 ),
                 observed_at=sample.observed_at,
             )
@@ -569,6 +635,16 @@ def _optional_number(value: object) -> int | float | None:
     return value
 
 
+def _portal_claim_value(value: object) -> PortalClaim | None:
+    if value is None:
+        return None
+    text = _required_str(value, "portal_claim")
+    try:
+        return PortalClaim(text)
+    except ValueError as exc:
+        raise ValueError(f"watch journal portal_claim is not a known claim: {text!r}") from exc
+
+
 def _optional_bool_value(value: object) -> bool | None:
     if value is None:
         return None
@@ -592,6 +668,7 @@ __all__ = [
     "JOURNAL_VERSION",
     "AccessWatchReport",
     "ConnectivityWatch",
+    "PortalClaim",
     "WatchBoundary",
     "WatchBoundaryKind",
     "WatchSample",

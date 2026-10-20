@@ -245,6 +245,11 @@ def render_watch_markdown(
             f"- Verified unrestricted samples after a recorded expiry with no "
             f"recorded renewal: {len(post_expiry)}"
         )
+    mismatches = [e for e in report.evidence if e.key == "watch:portal-claim-mismatch"]
+    if mismatches:
+        lines.append(
+            f"- Samples where access worked but the portal showed no package: {len(mismatches)}"
+        )
     lines.append("")
 
     lines.append("## Findings")
@@ -282,13 +287,16 @@ def render_watch_markdown(
     lines.append("## Observations")
     lines.append("")
     if report.samples:
-        lines.append("| # | Epoch | Observed at | Classification | Profile | Portal |")
-        lines.append("|---|---|---|---|---|---|")
+        lines.append(
+            "| # | Epoch | Observed at | Classification | Portal claim | Profile | Portal |"
+        )
+        lines.append("|---|---|---|---|---|---|---|")
         for index, sample in enumerate(report.samples, start=1):
             portal = f"`{_redact(sample.portal_url)}`" if sample.portal_url else "-"
+            claim = sample.portal_claim.value.replace("_", " ") if sample.portal_claim else "not recorded"
             lines.append(
                 f"| {index} | {sample.epoch} | {sample.observed_at.isoformat()} | "
-                f"{sample.state.value} | {sample.profile_name} | {portal} |"
+                f"{sample.state.value} | {claim} | {sample.profile_name} | {portal} |"
             )
     else:
         lines.append("No observations recorded yet.")
@@ -324,8 +332,23 @@ def render_watch_markdown(
         lines.append("No watch-derived evidence yet.")
     lines.append("")
 
+    annotated = [s for s in report.samples if s.note]
+    lines.append("## Observation notes")
+    lines.append("")
+    if annotated:
+        for sample in annotated:
+            lines.append(f"- {sample.observed_at.isoformat()}: {sample.note}")
+    else:
+        lines.append("No free-text notes recorded.")
+    lines.append("")
+
     lines.append("## How to read this report")
     lines.append("")
+    lines.append(
+        "- The portal claim is what the portal showed you when you looked; the "
+        "tool does not fetch the portal while measuring, because that request can "
+        "itself reset the hotspot session."
+    )
     for note in report.notes:
         lines.append(f"- {note}")
     lines.append("")

@@ -221,3 +221,54 @@ class TestJsonFormat:
         assert payload["samples"][0]["state"] == "unrestricted"
         assert payload["findings"][0]["check_slug"] == "post_expiry_access"
         assert payload["evidence"][0]["key"].startswith("watch:")
+
+
+class TestPortalClaim:
+    def test_unknown_claim_is_rejected(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_detector(monkeypatch, _detector(_unrestricted()))
+        result = _watch(
+            CliRunner(),
+            journal,
+            "--target",
+            "maz.wifi",
+            "--portal",
+            "buy-something",
+            "--authorized",
+        )
+        assert result.exit_code == 2
+        assert "is not one of" in result.output
+        assert "purchase_required" in result.output
+
+    def test_claim_is_recorded_and_reported(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_detector(monkeypatch, _detector(_unrestricted()))
+        result = _watch(
+            CliRunner(),
+            journal,
+            "--target",
+            "maz.wifi",
+            "--portal",
+            "purchase_required",
+            "--note",
+            "tethered laptop opened the portal",
+            "--authorized",
+        )
+        assert result.exit_code == 0, result.output
+        assert "portal_claim_mismatch" in result.output
+        assert "tethered laptop opened the portal" in result.output
+
+        stored = json.loads(journal.read_text(encoding="utf-8"))
+        assert stored["samples"][0]["portal_claim"] == "purchase_required"
+        assert stored["samples"][0]["note"] == "tethered laptop opened the portal"
+
+    def test_active_session_claim_is_consistent(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_detector(monkeypatch, _detector(_unrestricted()))
+        result = _watch(CliRunner(), journal, "--portal", "active_session", "--authorized")
+        assert result.exit_code == 0, result.output
+        assert "portal_claim_mismatch" not in result.output
+        assert "Findings raised: none" in result.output
