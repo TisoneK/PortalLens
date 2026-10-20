@@ -52,7 +52,6 @@ is your stable session tag.
 
 | Name | Codename | Model | Doing | Status | Status detail |
 |------|----------|-------|-------|--------|---------------|
-| Rhoda | S024 | unknown (Buffy agent; exact model id not exposed) | Engineer - migrating the context ledger to core 2.2.0 | Working | Phase 2 check-in; migrate + rename committed |
 
 **Keep your Status cells current — that is what the board is for.** The
 next live worker reads it to know at a glance what a peer has finished,

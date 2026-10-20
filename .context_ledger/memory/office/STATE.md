@@ -5,7 +5,7 @@ at check-in and at exit. This is a DERIVED VIEW for fast orientation;
 open the file a line points at when your task needs more than the
 line gives you. Full reading order: ledger-schema.md. -->
 
-_Regenerated: 2026-10-20T20:51:03Z_
+_Regenerated: 2026-10-20T20:52:50Z_
 
 ## Standing params
 - **Core:** 2.2.0 (locked, verified 2026-10-20)
@@ -15,10 +15,10 @@ _Regenerated: 2026-10-20T20:51:03Z_
 - Full params: `memory/workflows/active.md`
 
 ## Office — who's in, right now
-- **Rhoda** (S024) — Working — Engineer - migrating the context ledger to core 2.2.0
+(office empty — no live roster rows)
 
 ## Current task
-- **23 (2026-10-20)** — feature (target from chat attachment: hotspot continues giving — *in progress*
+- **24 (2026-10-20)** — completed — migrated the vendored protocol from core 0.5.0 to the Context Ledger 2.2.0, including the `.context/` → `.context_ledger/` … — *idle*
 
 ## Backlog — High priority (the top of the queue)
 (none)
@@ -26,7 +26,7 @@ _Regenerated: 2026-10-20T20:51:03Z_
 _0 medium, 0 low priority row(s) — see tasks/backlog.md_
 
 ## Logs at a glance — open only if your task touches these
-- flaws/log.md (protocol/.context_ledger friction): 9 entries, last added 2026-08-02
+- flaws/log.md (protocol/.context_ledger friction): 11 entries, last added 2026-10-20
 - inefficiencies/log.md (project code/env friction): 30 entries, last added 2026-08-02
 - plans/decisions.md (ADRs in force — respected, not relitigated): 25 entries, last added 2026-08-02
 

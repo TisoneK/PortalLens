@@ -88,3 +88,21 @@ Friction caused by the `.context/` system or the protocol itself. See
 - **Root cause:** Session 13's `feat(security): add captive portal bypass detection` landed `bypass_detection.py` + new probe tests without a `mypy --strict` pass on the new test code. Drift came in with the product commit; no later regression.
 - **Suggested fix:** (a) Run `mypy --strict src tests` and paste the full output to research R3 so the fix scope is exact. (b) Add a pre-commit `mypy --strict src tests` hook + a CI check (the typical two-layer idiom; pre-PR-only is unreliable). (c) Edit each of the 17 sites — likely one-line type narrowing for the `portal_type` calls, and a parameter / return annotation for the test_tui.py fixture. Update `workflows/active.md` if strict is too noisy for daily work — do not let it lag silently.
 - **Status:** open (planned Session-15 candidate per research R3).
+
+---
+## 2026-10-20 — Rhoda / unknown (Session 24, core 2.2.0)
+- **Flaw:** `ledger-sync rename` and `ledger-guard push-check` cannot both be satisfied. `rename` does `git mv .context .context_ledger`, so its commit touches `.context_ledger/` plus the old `.context/` paths; `push-check` classifies every path outside `$LEDGER_NAME/` as the product surface and fails the commit as "touches both surfaces -- split it into two commits". With the 2.2.0 hooks installed, a project that migrates by the documented recipe can never push the rename commit.
+- **Symptom:** `git push` aborts with `VIOLATION <sha> chore(ledger): rename ...`; the only escape is `--no-verify`, which the protocol explicitly treats as bypassing a gate.
+- **Root cause:** `push-check` is purely path-prefix based and has no notion of a rename (`git diff-tree --name-only` without `-M`), and it does not exempt deletion-only entries of the ledger's previous name. The two features shipped in the same release line (0.18 rename, 2.2.0 push check) and no project had exercised them together.
+- **Workaround used:** rebuild the local history as three commits — add the new `.context_ledger/` tree, delete the old `.context/` paths, then repoint the root entry files (AGENTS.md/CLAUDE.md) — which passes the check but leaves one intermediate commit where both trees exist.
+- **Suggested fix (upstream):** teach `push-check` that a deleted path under a known legacy ledger name (`.context/`) counts as the ledger surface, or run its diff with `-M` and attribute a rename wholly to the ledger.
+- **Status:** open — back-port candidate.
+
+---
+## 2026-10-20 — Rhoda / unknown (Session 24, core 2.2.0)
+- **Flaw:** `ledger-sync migrate` did not backfill two files the current templates ship: `memory/collaboration/README.md` (the whole directory was absent) and `memory/workflows/gates.conf`. Kickoff Phase 3 requires reading the collaboration README and `gates.conf`, so a freshly migrated project is told to read files the migration never created. `memory/office/STATE.md` was also absent until `ledger-state generate` was run by hand.
+- **Symptom:** post-migrate `ls .context_ledger/memory` showed no `collaboration/`; `ledger-gates run` had no registry to read.
+- **Root cause:** backfill appears to seed only files whose parent module it recognizes as part of the 1.0.0 office regrouping; durable modules added after 0.5.0 (collaboration) and workflow configs are skipped when the module directory does not already exist.
+- **Workaround used:** copied both files from `core/templates/memory/` and regenerated STATE.md.
+- **Suggested fix (upstream):** backfill should compare the template tree against the live tree file-by-file and seed every missing file, not only the office module.
+- **Status:** open — back-port candidate.

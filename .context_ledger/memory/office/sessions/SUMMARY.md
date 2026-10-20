@@ -102,3 +102,8 @@ records.
 ---
 - **2026-08-02 — Session 22** — Buffy / deepseek-v4-flash — fixed the Wi-Fi selection crash and added safe automatic refresh in both TUIs; rendered rows now survive selection-only state updates, stale rows are disabled during scans, and timers clean up on unmount. 309 tests green.
   Detail: .context/memory/reviews/2026-08-02-review-5.md
+
+---
+- **2026-10-20 — Session 24** — Rhoda / unknown — migrated the vendored protocol from core 0.5.0 to the Context Ledger 2.2.0 and renamed `.context/` to `.context_ledger/`.
+  Key decision: split the rename into add-new / delete-old / repoint-root commits because the push check treats a rename's old paths as a second surface.
+  Detail: `.context_ledger/memory/office/sessions/2026-10-20-24/notes.md`

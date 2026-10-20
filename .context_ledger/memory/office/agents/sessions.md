@@ -233,3 +233,13 @@ past entries — append corrections instead.
 - **Outcome:** done — selection no longer mutates Textual rows during dispatch; both lists auto-refresh, skip overlapping UI rescans, disable stale rows during scans, and clean up timers on unmount. Added keyboard, callback, cancellation, lifecycle, and timing-safe regression coverage; 309 tests pass.
 - **Open items:** selected-session connection, captive-portal handoff, redacted live-event persistence, and stop/switch orchestration remain the next Wi-Fi feature slice in `tasks/backlog.md` / ADR-24.
 - **Report:** `.context/memory/reviews/2026-08-02-review-5.md`
+
+---
+## 2026-10-20 — Session 24
+- **Agent:** Rhoda | **Model:** unknown (Buffy agent; exact model id not exposed) | **Platform:** Tisone's Windows workstation (local, Git Bash) | **Role:** engineer | **Core:** 2.2.0
+- **Task:** "Migrate the context ledger" — the protocol was vendored at core 0.5.0 in `.context/`; bring it to the Context Ledger (2.2.0), including the `.context_ledger/` rename and the new office layout.
+- **Commits:** 6 (6fdceb0..bd9bcce) — ledger migrate + rename, legacy-path removal, root entry-point repoint, guard hooks, check-in, STATE
+- **Outcome:** done — core 0.5.0 -> 2.2.0 verified against its manifest (all PowerShell ports parse); memory regrouped into `memory/office/`; `history/`, `archive/`, roster, parking lot and collaboration zone seeded; kickoff/AGENTS/CLAUDE regenerated with real facts; `workflows/active.md` repointed; `gates.conf` wired to ruff + mypy (pre-commit) and pytest (exit); `.context/` renamed to `.context_ledger/`; guard hooks installed. Gates and 336 tests green; push-check clean.
+- **Open items:** the office is at 25 sessions against `office_size=20` — the door trigger is past and the close is deferred to the next check-in (parking lot). A peer session's uncommitted hotspot-expiry work in `src/`/`tests/`/docs was left untouched and uncommitted.
+- **Notes:** `.context_ledger/memory/office/sessions/2026-10-20-24/notes.md`
+- **Report:** none (migration session — detail in the notes file)

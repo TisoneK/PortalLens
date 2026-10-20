@@ -116,3 +116,6 @@ don't remove the line.
 
 ---
 - **Session 20 bookkeeping correction (2026-08-02):** The bounded captive-portal detection slice marked done above shipped in product commit `bba1063` (`feat(wifi): add bounded captive portal detection`). The earlier `SESSION20_COMMIT` token was a temporary placeholder and is superseded by this correction; no product work remains pending for that item.
+
+---
+- [ ] **Close the office at the next check-in** (added 2026-10-20 by Rhoda / Session 24) — `agents/sessions.md` holds 25 sessions against `office_size=20` (default in `workflows/history.conf`), so the door trigger is past and the next session must run `sh .context_ledger/core/bin/ledger-history close` (dry run, have the record contents ready, then `--confirm`) as the first thing after syncing, before the deep read. Deliberately deferred at migration time: a peer session's live task lock was inside the directory a close freezes, and the migration had only just moved it. Follow the pre-close checklist — freeze verbatim, fill `history/office-001.md`, re-seed work-only rows into the fresh backlog.
