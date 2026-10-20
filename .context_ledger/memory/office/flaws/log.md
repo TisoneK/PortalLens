@@ -49,3 +49,12 @@ names them), and roll-up candidates.
 - **Workaround used:** seeded both from `core/templates/memory/` and generated STATE.md.
 - **Suggested fix (upstream):** backfill should diff the template tree against the live tree and seed every missing file, not only known office modules.
 - **Status:** open — back-ported to the new office's backlog.
+
+---
+## 2026-10-20 — core 2.2.0
+- **Flaw:** `ledger-history close` only passes `ledger-guard push-check` if the freeze and the live-office reset land in ONE commit. The check exempts a removed append-only line when the same line is re-added in the same diff — which is exactly what the close does (the line moves into `history/office-NNN/`). Splitting the close into "freeze + record" then "reset the live office" makes the second commit look like an unarchived rewrite of `agents/sessions.md`, and the push is refused with no compliant way to finish it except a guard skip.
+- **Symptom:** the reset commit's push aborted with `append-only log edited (a past line was removed or rewritten, not moved to an archive)`; the close was completed with `LEDGER_GUARD_SKIP=1` (logged to `.git/ledger-guard.log`).
+- **Root cause:** the exemption is scoped to one commit, and nothing in `ledger-history close`'s checklist says "stage the freeze and the reset together". Staging was done by hand from a checklist that listed them as separate bullets.
+- **Workaround used:** one documented guard skip for the reset commit, with the reason in its message.
+- **Suggested fix (upstream):** have `ledger-history close` stage the whole close itself (freeze + record + reset + re-seed) so the commit cannot be split, or make `push-check` accept a commit that deletes a line already present verbatim under `history/`.
+- **Status:** open — back-port candidate.

@@ -64,7 +64,6 @@ Full spec: `.context_ledger/core/schemas/ledger-schema.md` →
 
 | ID | Summary |
 |----|---------|
-| B-2026-10-20-1 | Finish the connectivity watch for post-expiry access (adopt the uncommitted slice already in the worktree: watch module, security check, export, tests, docs) — partial |
 | B-2026-10-20-2 | Wire captive-portal detection into the Wi-Fi session controller with generation guards, cancellation and host-status gating (see ADR-23, ADR-24) |
 | B-2026-10-20-3 | Back-port the two Context Ledger defects to the upstream package: `ledger-sync rename` vs `ledger-guard push-check`, and `migrate`'s missing backfill of collaboration/README.md and workflows/gates.conf (detail in the frozen office-001 flaws log) |
 
@@ -72,6 +71,7 @@ Full spec: `.context_ledger/core/schemas/ledger-schema.md` →
 
 | ID | Summary |
 |----|---------|
+| B-2026-10-20-15 | Surface the post-expiry watch in the live console and attach its finding to a persisted investigation |
 | B-2026-10-20-4 | Append redacted Wi-Fi live-event persistence: SQLite migration plus event path for scans, connection states, portal detection, cancellation and target switches |
 | B-2026-10-20-5 | Parse RFC 8910 captive-portal provisioning (DHCPv4 opt 114, DHCPv6 opt 103, IPv6 RA opt 37) into a typed, provenance-carrying endpoint source |
 | B-2026-10-20-6 | Validate the three documented-only signatures (CoovaChilli, UniFi, Meraki) against real captures, then flip their provenance to validated (ADR-6) |

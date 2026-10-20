@@ -52,7 +52,6 @@ is your stable session tag.
 
 | Name | Codename | Model | Doing | Status | Status detail |
 |------|----------|-------|-------|--------|---------------|
-| Rhoda | S001 | unknown (Buffy agent; exact model id not exposed) | Engineer - taking over the post-expiry connectivity watch | Working | Session 1 of the new office; adopting the uncommitted Wi-Fi watch slice |
 
 **Keep your Status cells current — that is what the board is for.** The
 next live worker reads it to know at a glance what a peer has finished,

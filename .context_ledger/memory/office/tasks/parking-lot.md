@@ -73,3 +73,10 @@ Loose ideas with no owner and no hook yet. The lowest-pressure shelf.
       this up cold — status qualifiers in the text; promote to the
       backlog when it becomes actionable> |
 -->
+
+---
+## Findings
+
+| ID | Finding |
+|----|---------|
+| P-2026-10-20-1 | **Why a hotspot can keep giving access after a paid package expires.** Five mechanisms fit the observed shape (access stops at expiry, returns after a reconnect, many customers affected): an expired session the gateway never tore down; MAC-cookie or device-based re-authorization restoring the device without re-checking the package; an IP-binding or trusted-device bypass; billing-to-RADIUS/router synchronization lag so the router still holds a valid authorization; or a free-access/trial/grace profile applied by policy. The reconnect detail matters: a stale session alone would not survive a reconnect, so a mechanism that re-authorizes the device (MAC cookie, ip-binding, grace profile, or stale accounting state) is the better fit. Confirming which one needs the operator's side (`/ip/hotspot/active`, `/ip/hotspot/ip-binding`, billing vs router logs); a customer can only establish the observable pattern, which is what the watch records. |

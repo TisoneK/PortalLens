@@ -7,5 +7,5 @@ its roster row (if left behind) says who was here; check the session
 entry and backlog before starting.
 
 - **Session:** 2026-10-20 — Rhoda / model not exposed by the harness
-- **Task:** takeover of the post-expiry connectivity watch: adopt the uncommitted Wi-Fi watch slice left by the session that died at the office close, verify what it does, and continue it to a finished, tested surface
-- **Status:** in-progress
+- **Task:** completed — took over the post-expiry connectivity watch and made it usable from the CLI, with a resumable journal and a report renderer
+- **Status:** idle

@@ -22,3 +22,13 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Notes:** .context_ledger/memory/office/sessions/<date>-<N>/notes.md  (or "none")
 - **Report:** .context_ledger/memory/office/reviews/YYYY-MM-DD-review.md
 -->
+
+---
+## 2026-10-20 — Session 1
+- **Agent:** Rhoda | **Model:** unknown (the harness does not expose a model id) | **Platform:** Tisone's Windows workstation (local) | **Role:** engineer | **Core:** 2.2.0
+- **Task:** Takeover of the post-expiry connectivity watch: answer why a paid hotspot can keep giving access after expiry, and make PortalLens detect it end to end rather than only fingerprint the portal.
+- **Commits:** `efff7ce` (office reset completion), `fd62389` (watch library + CLI) and the closing ledger commit
+- **Outcome:** done — adopted the unfinished watch slice, added `portallens watch` with a target-labelled journal so observations survive across real reconnects, a watch report renderer, JSON output, 12 CLI tests and docs. 348 tests pass; ruff and mypy strict clean; a real run classified the connection and raised the finding. Recorded the five candidate mechanisms behind post-expiry access.
+- **Open items:** B-2026-10-20-15 (surface the watch in the console and attach its findings to a persisted investigation). The check stays provisional until validated against a real capture (ADR-6).
+- **Notes:** `.context_ledger/memory/office/sessions/2026-10-20-1/notes.md`
+- **Report:** none (feature session — see the notes file and the changelog entry)

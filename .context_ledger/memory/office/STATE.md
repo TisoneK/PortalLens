@@ -5,7 +5,7 @@ at check-in and at exit. This is a DERIVED VIEW for fast orientation;
 open the file a line points at when your task needs more than the
 line gives you. Full reading order: ledger-schema.md. -->
 
-_Regenerated: 2026-10-20T21:09:40Z_
+_Regenerated: 2026-10-20T21:39:53Z_
 
 ## Standing params
 - **Core:** 2.2.0 (locked, verified 2026-10-20)
@@ -15,20 +15,19 @@ _Regenerated: 2026-10-20T21:09:40Z_
 - Full params: `memory/workflows/active.md`
 
 ## Office — who's in, right now
-- **Rhoda** (S001) — Working — Engineer - taking over the post-expiry connectivity watch
+(office empty — no live roster rows)
 
 ## Current task
-- **2026-10-20 — Rhoda / model not exposed by the harness** — takeover of the post-expiry connectivity watch: adopt the uncommitted Wi-Fi watch slice left by the session that died at the office close, … — *in-progress*
+- **2026-10-20 — Rhoda / model not exposed by the harness** — completed — took over the post-expiry connectivity watch and made it usable from the CLI, with a resumable journal and a report renderer — *idle*
 
 ## Backlog — High priority (the top of the queue)
-| B-2026-10-20-1 | Finish the connectivity watch for post-expiry access (adopt the uncommitted slice already in the worktree: watch module, security check, export, tests, docs) — partial |
 | B-2026-10-20-2 | Wire captive-portal detection into the Wi-Fi session controller with generation guards, cancellation and host-status gating (see ADR-23, ADR-24) |
 | B-2026-10-20-3 | Back-port the two Context Ledger defects to the upstream package: `ledger-sync rename` vs `ledger-guard push-check`, and `migrate`'s missing backfill of collaboration/README.md and workflows/gates.conf (detail in the frozen office-001 flaws log) |
 
-_6 medium, 5 low priority row(s) — see tasks/backlog.md_
+_7 medium, 5 low priority row(s) — see tasks/backlog.md_
 
 ## Logs at a glance — open only if your task touches these
-- flaws/log.md (protocol/.context_ledger friction): 2 entries, last added 2026-10-20
+- flaws/log.md (protocol/.context_ledger friction): 3 entries, last added 2026-10-20
 - inefficiencies/log.md (project code/env friction): 0 entries
 - plans/decisions.md (ADRs in force — respected, not relitigated): 25 entries, last added 2026-08-02
 
