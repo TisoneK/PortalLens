@@ -95,3 +95,10 @@ Full spec: `.context_ledger/core/schemas/ledger-schema.md` →
 | B-<YYYY-MM-DD>-<n> | <what to DO, one line, pointing at the issue/PR/
       parking-lot finding for detail — not the full context> |
 -->
+
+## From the 2026-10-21 maz.wifi measurement
+
+- **B-2026-10-21-01 -- capture the gateway's own session budget** (owner: next session). `/status` on a MikroTik hotspot reports `Connected / left`; that countdown is the network's own admission of a bounded session and is far stronger evidence than reachability alone. Add a bounded, allow-listed status probe that fills `WatchSample.seconds_remaining`, so enforcement is measured from the gateway's side.
+- **B-2026-10-21-02 -- verify disconnect trigger #2 with a second client** (owner: user + next session). Another device authorizing on the same hotspot reportedly evicts the first and shows the packages page. Needs a second device; record both MACs' epochs and the portal claim on each.
+- **B-2026-10-21-03 -- reconcile billing scope before claiming unentitled access** (owner: next session). ISPMan's payments list is empty per MAC; check whether credit is account-level (`MAZ-U3LMJY`). "No per-device payment" is not "operator received nothing".
+- **B-2026-10-21-04 -- correlate the budget with the purchased duration.** The observed ~2h21m budget matches no advertised package; a session whose `left` exceeds the package bought is the cleanest single-number proof of over-grant.
