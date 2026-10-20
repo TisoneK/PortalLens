@@ -5,10 +5,10 @@ at check-in and at exit. This is a DERIVED VIEW for fast orientation;
 open the file a line points at when your task needs more than the
 line gives you. Full reading order: ledger-schema.md. -->
 
-_Regenerated: 2026-10-20T21:39:53Z_
+_Regenerated: 2026-10-20T21:57:18Z_
 
 ## Standing params
-- **Core:** 2.2.0 (locked, verified 2026-10-20)
+- **Core:** 2.2.0 (locked, verified 2026-10-21)
 - **Target:** feature — bootstrap PortalLens MVP: plugin-based Portal core abstraction + captive_wifi analyzer (passive: fingerprinting, platform identification, network-architecture inference, relationship mapping) + evidence-backed reporting with confidence scores
 - **Scope:** discovery + review + feature implementation (MVP scaffold is the standing target until the project has a runnable baseline)
 - **Push policy:** push to main directly after each commit
@@ -18,13 +18,13 @@ _Regenerated: 2026-10-20T21:39:53Z_
 (office empty — no live roster rows)
 
 ## Current task
-- **2026-10-20 — Rhoda / model not exposed by the harness** — completed — took over the post-expiry connectivity watch and made it usable from the CLI, with a resumable journal and a report renderer — *idle*
+- **2026-10-20 — Rhoda / model not exposed by the harness** — completed — added the portal-claim dimension (recorded, never fetched) and the portal_claim_mismatch check — *idle*
 
 ## Backlog — High priority (the top of the queue)
 | B-2026-10-20-2 | Wire captive-portal detection into the Wi-Fi session controller with generation guards, cancellation and host-status gating (see ADR-23, ADR-24) |
 | B-2026-10-20-3 | Back-port the two Context Ledger defects to the upstream package: `ledger-sync rename` vs `ledger-guard push-check`, and `migrate`'s missing backfill of collaboration/README.md and workflows/gates.conf (detail in the frozen office-001 flaws log) |
 
-_7 medium, 5 low priority row(s) — see tasks/backlog.md_
+_8 medium, 5 low priority row(s) — see tasks/backlog.md_
 
 ## Logs at a glance — open only if your task touches these
 - flaws/log.md (protocol/.context_ledger friction): 3 entries, last added 2026-10-20

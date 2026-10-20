@@ -7,5 +7,5 @@ its roster row (if left behind) says who was here; check the session
 entry and backlog before starting.
 
 - **Session:** 2026-10-20 — Rhoda / model not exposed by the harness
-- **Task:** completed — took over the post-expiry connectivity watch and made it usable from the CLI, with a resumable journal and a report renderer
+- **Task:** completed — added the portal-claim dimension (recorded, never fetched) and the portal_claim_mismatch check
 - **Status:** idle

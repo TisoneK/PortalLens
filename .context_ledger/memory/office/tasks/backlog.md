@@ -71,6 +71,7 @@ Full spec: `.context_ledger/core/schemas/ledger-schema.md` →
 
 | ID | Summary |
 |----|---------|
+| B-2026-10-20-16 | Validate `post_expiry_access` and `portal_claim_mismatch` against a real capture and promote their provenance from documented (ADR-6) |
 | B-2026-10-20-15 | Surface the post-expiry watch in the live console and attach its finding to a persisted investigation |
 | B-2026-10-20-4 | Append redacted Wi-Fi live-event persistence: SQLite migration plus event path for scans, connection states, portal detection, cancellation and target switches |
 | B-2026-10-20-5 | Parse RFC 8910 captive-portal provisioning (DHCPv4 opt 114, DHCPv6 opt 103, IPv6 RA opt 37) into a typed, provenance-carrying endpoint source |
