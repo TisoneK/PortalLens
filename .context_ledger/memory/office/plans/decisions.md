@@ -269,6 +269,13 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
 - **Consequences:** The primary UX is available now without misrepresenting unsupported network behavior. The next Wi-Fi slice must attach the bounded detector through the generation-guarded session controller, then add redacted event persistence and stop/switch orchestration. Public docs should describe this boundary in user-facing language.
 
 ---
+## ADR-25: Preserve rendered Wi-Fi rows during selection and refresh (2026-08-02)
+- **Status:** accepted
+- **Context:** Textual mounts `ListItem` children asynchronously. A selection handler can synchronously publish controller state while Textual is still dispatching `ListView.Selected`; clearing and rebuilding the same list in that callback can crash or leave the list empty. Automatic refresh introduces the same mount race if identical scan results rebuild rows unnecessarily.
+- **Decision:** Both Wi-Fi UIs compare a stable, display-relevant row signature (identity, display name, security, and signal) before replacing list children. Selection-only state updates do not mutate the `ListView`. During a scan, existing rows remain visible but the list is disabled until a ready result is rendered. UI scan controls skip requests while a scan is already active; refresh timers are stopped and cleared during unmount.
+- **Consequences:** Keyboard selection remains safe, repeated automatic refresh does not duplicate or erase rows, and stale rows cannot be selected during a scan. The controller retains its generation-based supersession API for direct callers; the single-flight guarantee described here applies to the TUI controls. The selected Wi-Fi workflow remains read-only until the separate connection/orchestration slice is implemented.
+
+---
 ## ADR-26: Default-credential audit — bounded, opt-in, own risk assessment (2026-10-21)
 - **Status:** accepted — implements the first action beyond detection permitted by ADR-16
 - **Context:** A live assessment of `maz.wifi` found the gateway's Telnet admin port (23, `10.111.0.1`) reachable from the client network, and `gateway_admin_exposed` fired at 65%. Reachability alone leaves the operator's real exposure unknown: the question that matters is whether the admin login still accepts a published vendor default, which on MikroTik is `admin` with a blank password. The user directed: "that is not out of scope build it."
@@ -285,8 +292,22 @@ relitigating them. To reverse one, append a new ADR that supersedes it.
   - Telnet is the only login transport implemented. HTTP/WebFig (digest auth) and SSH (key exchange) would each need their own bounded implementation and are not promised by this ADR.
 
 ---
-## ADR-25: Preserve rendered Wi-Fi rows during selection and refresh (2026-08-02)
-- **Status:** accepted
-- **Context:** Textual mounts `ListItem` children asynchronously. A selection handler can synchronously publish controller state while Textual is still dispatching `ListView.Selected`; clearing and rebuilding the same list in that callback can crash or leave the list empty. Automatic refresh introduces the same mount race if identical scan results rebuild rows unnecessarily.
-- **Decision:** Both Wi-Fi UIs compare a stable, display-relevant row signature (identity, display name, security, and signal) before replacing list children. Selection-only state updates do not mutate the `ListView`. During a scan, existing rows remain visible but the list is disabled until a ready result is rendered. UI scan controls skip requests while a scan is already active; refresh timers are stopped and cleared during unmount.
-- **Consequences:** Keyboard selection remains safe, repeated automatic refresh does not duplicate or erase rows, and stale rows cannot be selected during a scan. The controller retains its generation-based supersession API for direct callers; the single-flight guarantee described here applies to the TUI controls. The selected Wi-Fi workflow remains read-only until the separate connection/orchestration slice is implemented.
+## ADR-27: Session-budget writes need operator credentials, dry-run first (2026-10-21)
+- **Status:** proposed — design only, no code (ADR-16 requires the assessment before the action)
+- **Context:** The assessment of `maz.wifi` showed the router, not the portal, decides how long access lasts: a 30-minute KES 8 package produced a 2h25m session, and the gateway renewed a 4-hour budget at 01:09:53 with no purchase and no portal request. The operator's opposite need follows directly — cap or extend one session on a gateway they administer. Asked whether the tool can add or reduce time, the honest answer today is no: PortalLens has no mutating call, and on this gateway there is no usable admin channel either (Telnet defaults refused; WebFig 8291 and API 8728/8729 filtered).
+- **Decision:** Design a single, explicitly gated **session-budget write path** — `portallens session cap|extend` — specified in `plans/session-budget-write-path.md`. It is the project's first mutation and is built on four rules:
+  - **Dry run is the default.** Without `--apply` the command prints the resolved session, the current uptime/limit, the exact RouterOS calls, and the resulting expiry — and changes nothing. There is no mode where a write happens without both `--apply` and `--authorized`.
+  - **Operator credentials only, over an encrypted transport.** Credentials come from a file path (never argv, never environment echoed into logs, never inside the repo); the write path refuses Telnet because a cleartext password is not acceptable for an account that can reconfigure the gateway. REST over HTTPS or API-SSL is the transport.
+  - **One session, bounded, reversible.** One MAC per invocation, matched by MAC *and* IP; extend defaults to 60 minutes with a hard cap of 240; cap refuses below one minute; the prior limit is recorded so `--rollback` can restore it.
+  - **Recorded like any other finding.** Before/after budget evidence, the redacted command list, and the outcome land in the investigation audit log. A failed login is recorded as negative evidence with **no retry** — this path never sprays credentials.
+- **Risk assessment:**
+  - **Blast radius.** A write affects a live gateway shared by other customers. The mitigations are scope (one MAC, one operation), an explicit `--apply`, a printed diff, and no bulk or scheduled mode. Removing a session drops that device's traffic; the dry run states this in the output.
+  - **Authority.** `--authorized` (ADR-15) is the caller's assertion, and credentials are evidence of administrative authority — stronger evidence than the flag alone. The tool still cannot verify ownership; the docs say so.
+  - **Secrets.** The credential file is a local path, excluded from git, never read into evidence, never printed, and excluded from the audit log. The existing secrets rule is unchanged and non-overridable.
+  - **Abuse.** This path does not discover, guess, or brute-force credentials — that ceiling stays where ADR-26 put it (three published defaults, read-only). Capability to *use* a credential the operator supplies is not capability to *obtain* one.
+- **Consequences:**
+  - Product wording changes from "read-only" to "read-only by default; one gated mutation", in README, ARCHITECTURE, and the tutorial.
+  - The pre-commit gate gains an assertion that no write path is reachable without both `--apply` and `--authorized`, and that dry run performs zero mutating calls against an injected transport.
+  - Any second mutation needs its own ADR on this pattern; this one does not generalise to "the tool may change gateways".
+  - RouterOS has no "add time" verb. The implementation must be honest about the two levers it really has: lower/raise the account's `limit-uptime`, and drop the active session so the gateway re-authorizes. Whichever is used, the audit log records which.
+- **Open questions:** RouterOS version and REST availability on this gateway (443 is open, 8291/8728/8729 are not); cap by session vs. by account; whether "cap" should mean `limit-uptime` or remove-and-reauth; whether an operator wants a one-shot command or a supervised session.
