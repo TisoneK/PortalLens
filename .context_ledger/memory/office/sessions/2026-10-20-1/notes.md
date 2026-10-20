@@ -100,3 +100,49 @@ The user reports that another device joining their hotspot gets redirected to
 the packages page and knocks the first device offline. Not reproducible from a
 single device; requires a second client to authorize while this one holds a
 session (queued as B-2026-10-21-02).
+
+## The renewal, observed (2026-10-21 01:09:51)
+
+The watcher sampled the gateway every 20s straight through the budget deadline:
+
+```
+01:08:53 gw connected/left = 2h20m28s / 58s
+01:09:14 gw connected/left = 2h20m49s / 37s
+01:09:35 gw connected/left = 2h21m10s / 16s
+01:09:56 gw connected/left = 3s / 1h38m19s      <- new session, no portal, no user action
+01:10:17 gw connected/left = 24s / 1h37m58s
+01:10:38 gw connected/left = 45s / 1h37m37s
+```
+
+Every sample in between was `captive=False` on the connectivity probe: the device
+never lost access and was never shown the purchase page.
+
+### The arithmetic that matters
+
+- Session 1: started 22:48:25, budget 2h21m26s, ended 01:09:51.
+- Session 2: started 01:09:53, budget 1h38m22s, ends **02:48:15**.
+- 22:48:25 + 4h = **02:48:25**. The two budgets sum to 3h59m48s.
+
+So this is not an unbounded grant: the gateway is spending a **4-hour
+entitlement** in two consecutive sessions, and it creates the second one
+**automatically at expiry** with no purchase, no portal, and no user action.
+4h is also a sold package (Ksh.25), yet the payments list for this MAC is empty.
+
+### Consequences for the model
+
+1. "Access without a package" = an entitlement the gateway holds but the
+   customer-facing portal does not show, renewed server-side.
+2. The observable "disconnect and ask to buy" should therefore happen when the
+   **4-hour horizon** is reached (02:48:15), not when a session's countdown ends.
+   A watcher is running across that horizon (`/tmp/horizon-watch.log`).
+3. If the horizon passes *and* a third session is issued, the grant is unbounded
+   — that is the real finding. If access falls to the portal at 02:48, the
+   gateway is enforcing correctly and the mismatch is only in what the portal
+   displays.
+
+### Side observation
+
+After the renewal, HTTPS reads to `captive.ispman.tech` began timing out
+(`ReadTimeout` at 15s and again at 40s) while `http://maz.wifi/status` answered
+normally. Not yet diagnosed: portal-side slowness, or the renewed session
+blocking the portal host.
