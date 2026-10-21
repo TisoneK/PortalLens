@@ -5,7 +5,7 @@ at check-in and at exit. This is a DERIVED VIEW for fast orientation;
 open the file a line points at when your task needs more than the
 line gives you. Full reading order: ledger-schema.md. -->
 
-_Regenerated: 2026-10-21T06:39:59Z_
+_Regenerated: 2026-10-21T06:44:59Z_
 
 ## Standing params
 - **Core:** 2.2.0 (locked, verified 2026-10-21)
@@ -16,7 +16,7 @@ _Regenerated: 2026-10-21T06:39:59Z_
 
 ## Office — who's in, right now
 - **Nadia** (S002) — Done — Dev environment bring-up: install the project's dependencies and verify the suite runs
-- **Kwame** (S003) — Done — Live validation of `--gateway-status` on KITENGELA@10: the fetch ran but parsed empty — d…
+- **Kwame** (S003) — Done — Report voice fix: the watch report addresses the reader as "you" and says "user-recorded"…
 
 ## Current task
 - **2026-10-20 — Rhoda / model not exposed by the harness** — completed — added the portal-claim dimension (recorded, never fetched) and the portal_claim_mismatch check — *idle*
