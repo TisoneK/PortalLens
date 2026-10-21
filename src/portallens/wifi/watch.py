@@ -164,6 +164,7 @@ _GATEWAY_SESSION_NO_PLAN_KEY = "watch:gateway-session-no-plan"
 _GATEWAY_SESSION_PAYMENT_CODE_KEY = "watch:gateway-session-username-payment-code-shape"
 _GATEWAY_STATUS_FETCH_KEY = "watch:gateway-status-fetch"
 _GATEWAY_STATUS_PERTURBATION_KEY = "watch:gateway-status-perturbation"
+_GATEWAY_STATUS_NO_SESSION_KEY = "watch:gateway-status-no-session"
 
 #: Claims that contradict verified internet access.
 _NO_PACKAGE_CLAIMS = frozenset({PortalClaim.PURCHASE_REQUIRED, PortalClaim.LOGIN_REQUIRED})
@@ -599,22 +600,65 @@ def _gateway_session_evidence(
         session = sample.gateway_session
         if session is None:
             continue
-        if not session.active:
-            continue
-        evidence.append(
-            _watch_evidence(
-                target,
-                _GATEWAY_SESSION_KEY,
-                session.username or "unknown",
-                (
-                    "The gateway's hotspot status page shows an active session "
-                    f"for username {session.username!r} (plan: "
-                    f"{session.plan or '(empty)'}; session-left: {session.session_left!r}; "
-                    f"expires-on: {session.expires_on!r}; bytes-left: {session.bytes_left!r})."
-                ),
-                observed_at=sample.observed_at,
+        if session.active:
+            evidence.append(
+                _watch_evidence(
+                    target,
+                    _GATEWAY_SESSION_KEY,
+                    session.username or "unknown",
+                    (
+                        "The gateway's hotspot status page shows an active session "
+                        f"for username {session.username!r} (plan: "
+                        f"{session.plan or '(empty)'}; session-left: {session.session_left!r}; "
+                        f"expires-on: {session.expires_on!r}; bytes-left: {session.bytes_left!r})."
+                    ),
+                    observed_at=sample.observed_at,
+                )
             )
-        )
+            if session.plan is None and session.limits_unassigned:
+                evidence.append(
+                    _watch_evidence(
+                        target,
+                        _GATEWAY_SESSION_NO_PLAN_KEY,
+                        session.username or "unknown",
+                        (
+                            "The gateway holds an active hotspot session with no "
+                            "plan attached and every limit 'Not assigned' — traffic "
+                            "is authorized with no time or byte cap from a purchased "
+                            "package."
+                        ),
+                        observed_at=sample.observed_at,
+                    )
+                )
+            if matches_payment_code_shape(session.username):
+                evidence.append(
+                    _watch_evidence(
+                        target,
+                        _GATEWAY_SESSION_PAYMENT_CODE_KEY,
+                        session.username or "",
+                        (
+                            "The session username has a payment-transaction-code "
+                            "shape (10 uppercase alphanumerics, e.g. a mobile-money "
+                            "receipt code) — a format inference suggesting the "
+                            "billing integration named the session after a payment."
+                        ),
+                        observed_at=sample.observed_at,
+                    )
+                )
+        else:
+            evidence.append(
+                _watch_evidence(
+                    target,
+                    _GATEWAY_STATUS_NO_SESSION_KEY,
+                    "no_session_view",
+                    (
+                        "The gateway's status page carried no session view for "
+                        "this device — a login redirect, an empty shell, or no "
+                        "session held. The session fields are absent, not zero."
+                    ),
+                    observed_at=sample.observed_at,
+                )
+            )
         if sample.gateway_fetch_perturbed is True:
             evidence.append(
                 _watch_evidence(
@@ -640,36 +684,6 @@ def _gateway_session_evidence(
                         "The connectivity classification was unchanged across "
                         "the gateway status fetch — this fetch did not visibly "
                         "perturb the hotspot session."
-                    ),
-                    observed_at=sample.observed_at,
-                )
-            )
-        if session.plan is None and session.limits_unassigned:
-            evidence.append(
-                _watch_evidence(
-                    target,
-                    _GATEWAY_SESSION_NO_PLAN_KEY,
-                    session.username or "unknown",
-                    (
-                        "The gateway holds an active hotspot session with no "
-                        "plan attached and every limit 'Not assigned' — traffic "
-                        "is authorized with no time or byte cap from a purchased "
-                        "package."
-                    ),
-                    observed_at=sample.observed_at,
-                )
-            )
-        if matches_payment_code_shape(session.username):
-            evidence.append(
-                _watch_evidence(
-                    target,
-                    _GATEWAY_SESSION_PAYMENT_CODE_KEY,
-                    session.username or "",
-                    (
-                        "The session username has a payment-transaction-code "
-                        "shape (10 uppercase alphanumerics, e.g. a mobile-money "
-                        "receipt code) — a format inference suggesting the "
-                        "billing integration named the session after a payment."
                     ),
                     observed_at=sample.observed_at,
                 )

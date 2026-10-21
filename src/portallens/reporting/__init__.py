@@ -381,6 +381,7 @@ def render_watch_markdown(
                 f"bytes-left {session.bytes_left or '?'}"
             )
             lines.append(f"  - Limits: {limits}")
+            lines.append(f"  - Source: {session.source_url or '(unknown)'}")
             if sample.gateway_fetch_perturbed is True:
                 lines.append(
                     "  - **The classification changed across this fetch — the "

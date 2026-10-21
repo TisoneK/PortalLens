@@ -345,6 +345,7 @@ class TestGatewayStatus:
         assert "session_username_payment_code_shape" in result.output
         assert "Local network" in result.output
         assert "Gateway session view" in result.output
+        assert "Source: http://11.220.0.1/status" in result.output
 
         stored = json.loads(journal.read_text(encoding="utf-8"))
         sample = stored["samples"][0]

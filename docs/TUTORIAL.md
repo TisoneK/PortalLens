@@ -592,6 +592,14 @@ perturbed the session and labels the session fields as post-perturbation
 state; if it did not, the report records that the fetch left the
 session visibly unchanged.
 
+Some gateways serve `/status` as a shell page whose iframe carries the
+real session view on the billing provider's own endpoint; the tool
+follows that iframe exactly once — still the same authorized,
+probe-bracketed fetch — and the report names the source URL each
+session view came from. If only the shell could be read, the username
+degrades to the one the shell's iframe URL carries, with the remaining
+fields left unknown rather than invented.
+
 The session view feeds two checks. `gateway_session_without_plan` fires
 when the gateway shows an active session with no plan and every limit
 "not assigned" — the shape one old payment explains everything.

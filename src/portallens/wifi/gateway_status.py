@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from urllib.parse import parse_qs, urlsplit
 
 from portallens.acquisition.fetcher import FetchedDocument
 from portallens.acquisition.fetcher import fetch as _http_fetch
@@ -70,11 +71,13 @@ def status_url_for_gateway(gateway_ipv4: str) -> str:
 def parse_mikrotik_status(text: str, *, source_url: str = "") -> GatewaySessionInfo:
     """Parse the MikroTik hotspot status template from HTML or flattened text.
 
-    The served page is a label/value table — row cells are read
+    The session view is a label/value table — row cells are read
     structurally so prose outside the table (footnote markers, links)
-    cannot bleed into a value. A copy-pasted rendering of the page (no
-    tags) is tokenized instead: known labels anchor the scan and a label
-    followed immediately by another label has an empty value, the shape a
+    cannot bleed into a value. Cells may be ``<td>`` or ``<th>``: the
+    billing-integrated template this was validated against renders its
+    labels as ``<th>``. A copy-pasted rendering of the page (no tags) is
+    tokenized instead: known labels anchor the scan and a label followed
+    immediately by another label has an empty value, the shape a
     profile-less session produces for PLAN/START-TIME.
     """
 
@@ -99,7 +102,7 @@ def _parse_status_rows(html: str) -> dict[str, str | None]:
 
     values: dict[str, str | None] = {}
     for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, flags=re.IGNORECASE | re.DOTALL):
-        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, flags=re.IGNORECASE | re.DOTALL)
+        cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, flags=re.IGNORECASE | re.DOTALL)
         if len(cells) != 2:
             continue
         label = re.sub(r"<[^>]+>", "", cells[0]).strip().upper()
@@ -108,6 +111,26 @@ def _parse_status_rows(html: str) -> dict[str, str | None]:
         value = re.sub(r"<[^>]+>", "", cells[1]).strip()
         values[label] = value if value else None
     return values
+
+
+def _iframe_src(html: str) -> str | None:
+    """The src of the first iframe, when the page is a shell around one."""
+
+    match = re.search(r"<iframe[^>]*\ssrc=[\"']([^\"']+)[\"']", html, flags=re.IGNORECASE)
+    return match.group(1) if match else None
+
+
+def _username_from_url(url: str) -> str | None:
+    """The ``username`` query parameter of a status URL, when present."""
+
+    try:
+        query = parse_qs(urlsplit(url).query)
+    except ValueError:
+        return None
+    values = query.get("username")
+    if not values or not values[0].strip():
+        return None
+    return values[0].strip()
 
 
 def _parse_status_tokens(text: str) -> dict[str, str | None]:
@@ -150,10 +173,47 @@ def fetch_gateway_session(
 
     Raises :class:`~portallens.acquisition.AcquisitionDenied` without
     ``policy.authorized`` — the caller owns the authorization decision.
+
+    Billing-integrated hotspots serve ``/status`` as a shell page whose
+    iframe carries the real session view, so a page with no session table
+    is followed exactly one level to its iframe (http/https only). When
+    the iframe cannot be read, the session username is degraded to the
+    ``username`` query parameter of the iframe src — the shell itself
+    leaks it — with every other field left unknown.
     """
 
     document = fetch(url, policy)
-    return parse_mikrotik_status(document.body, source_url=document.final_url)
+    session = parse_mikrotik_status(document.body, source_url=document.final_url)
+    if session.active:
+        return session
+
+    iframe = _iframe_src(document.body)
+    if iframe is None or not iframe.lower().startswith(("http://", "https://")):
+        return session
+
+    try:
+        inner = fetch(iframe, policy)
+    except Exception:
+        inner = None
+    if inner is not None:
+        inner_session = parse_mikrotik_status(inner.body, source_url=inner.final_url)
+        if inner_session.active:
+            return inner_session
+
+    username = _username_from_url(iframe)
+    if username is not None:
+        return GatewaySessionInfo(
+            username=username,
+            mac=None,
+            ip=None,
+            plan=None,
+            start_time=None,
+            session_left=None,
+            expires_on=None,
+            bytes_left=None,
+            source_url=iframe,
+        )
+    return session
 
 
 #: Mobile-money transaction codes (M-Pesa and similar integrations) are

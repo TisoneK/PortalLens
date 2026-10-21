@@ -469,6 +469,58 @@ class TestGatewaySessionEvidence:
         (fetch,) = [e for e in report.evidence if e.key == "watch:gateway-status-fetch"]
         assert fetch.value == "no_classification_change"
 
+    def test_empty_session_view_still_records_fetch_evidence(self) -> None:
+        """The live KITENGELA@10 run: shell page parsed empty, no evidence appeared."""
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=GatewaySessionInfo(
+                username=None,
+                mac=None,
+                ip=None,
+                plan=None,
+                start_time=None,
+                session_left=None,
+                expires_on=None,
+                bytes_left=None,
+                source_url="http://11.220.0.1/status",
+            ),
+            gateway_fetch_perturbed=False,
+        )
+        report = watch.report()
+        keys = {e.key for e in report.evidence}
+        assert "watch:gateway-status-no-session" in keys
+        assert "watch:gateway-status-fetch" in keys
+        assert "watch:gateway-session-active" not in keys
+        assert report.findings == ()
+
+    def test_empty_session_with_perturbation_records_both(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=GatewaySessionInfo(
+                username=None,
+                mac=None,
+                ip=None,
+                plan=None,
+                start_time=None,
+                session_left=None,
+                expires_on=None,
+                bytes_left=None,
+                source_url="http://11.220.0.1/status",
+            ),
+            gateway_fetch_perturbed=True,
+        )
+        report = watch.report()
+        keys = {e.key for e in report.evidence}
+        assert "watch:gateway-status-no-session" in keys
+        assert "watch:gateway-status-perturbation" in keys
+        assert "watch:gateway-status-fetch" not in keys
+
     def test_perturbed_fetch_records_perturbation_evidence(self) -> None:
         reset_evidence_ids()
         watch = ConnectivityWatch()

@@ -1,12 +1,18 @@
 """Tests for the MikroTik hotspot gateway status parser and fetch.
 
-The HTML fixture reproduces the shape of the RouterOS hotspot status
-template observed live on KITENGELA@10 (label/value rows, empty PLAN and
-START-TIME cells, "Not assigned *" limit rows); the flattened fixture is the
-user's copy-paste rendering of the same page, which must parse identically.
+Fixtures reproduce both shapes observed live on KITENGELA@10: the
+RouterOS-style label/value table (STATUS_HTML, two ``<td>`` cells per
+row, empty PLAN and START-TIME cells, "Not assigned *" limit rows); the
+billing-provider template the gateway's shell page iframes
+(BILLING_HTML, ``<th>`` labels, ``<td>`` values, TITLE/VALUE thead); and
+the shell page itself (SHELL_HTML), which carries no table at all. The
+flattened fixture is the user's copy-paste rendering of the session
+view, which must parse identically.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 from portallens.acquisition.fetcher import FetchedDocument
 from portallens.portal import AcquisitionPolicy
@@ -39,6 +45,59 @@ STATUS_TEXT = (
     "PLAN START-TIME SESSION-LEFT Not assigned * EXPIRES-ON Not assigned * "
     "BYTES LEFT Not assigned *"
 )
+
+# The live KITENGELA@10 gateway serves /status as a shell whose iframe
+# carries the real session view on the billing provider's endpoint —
+# labels rendered as <th> cells, values as <td>, and a TITLE/VALUE thead.
+SHELL_HTML = """\
+<html><head><title>Internet Hotspot - Status</title></head>
+<body><iframe src="https://asp.billnasi.com/endpoints/status?username=UIBMX5SUY3" \
+frameborder="0" width="100%"></iframe></body></html>
+"""
+
+BILLING_HTML = """\
+<!DOCTYPE html><html lang="en"><head><title>CHECK VOUCHER STATUS VERBOSE</title></head>
+<body><div class="container-fluid my-3">
+<table style=' border-collapse: collapse;'>
+<thead>
+<th>TITLE</th>
+<th>VALUE</th>
+</thead>
+<tr>
+    <th>USERNAME</th>
+    <td>UIBMX5SUY3</td>
+</tr>
+<tr>
+    <th>MAC</th>
+    <td>98:AF:65:7C:6A:69</td>
+</tr>
+<tr>
+    <th>IP</th>
+    <td>11.220.2.109</td>
+</tr>
+<tr>
+    <th>PLAN</th>
+    <td></td>
+</tr>
+<tr>
+    <th>START-TIME</th>
+    <td>                            </td>
+</tr>
+<tr>
+    <th>SESSION-LEFT</th>
+    <td>Not assigned *</td>
+</tr>
+<tr>
+    <th>EXPIRES-ON</th>
+    <td>Not assigned *</td>
+</tr>
+<tr>
+    <th>BYTES LEFT</th>
+    <td>Not assigned *</td>
+</tr>
+</table>
+</body></html>
+"""
 
 
 class TestParseStatusPage:
@@ -95,6 +154,27 @@ class TestPaymentCodeShape:
         assert not matches_payment_code_shape(None)
 
 
+class TestBillingTemplate:
+    def test_th_label_cells_parse_like_td(self) -> None:
+        info = parse_mikrotik_status(
+            BILLING_HTML, source_url="https://asp.billnasi.com/endpoints/status"
+        )
+        assert info.username == "UIBMX5SUY3"
+        assert info.mac == "98:AF:65:7C:6A:69"
+        assert info.ip == "11.220.2.109"
+        assert info.plan is None
+        assert info.start_time is None  # whitespace-only cell
+        assert info.session_left == "Not assigned *"
+        assert info.expires_on == "Not assigned *"
+        assert info.bytes_left == "Not assigned *"
+        assert info.active
+        assert info.limits_unassigned
+
+    def test_shell_page_alone_is_not_a_session(self) -> None:
+        info = parse_mikrotik_status(SHELL_HTML)
+        assert not info.active
+
+
 class TestFetch:
     def test_url_builder_targets_gateway_status_page(self) -> None:
         assert status_url_for_gateway("11.220.0.1") == "http://11.220.0.1/status"
@@ -114,4 +194,129 @@ class TestFetch:
         policy = AcquisitionPolicy(authorized=True)
         info = fetch_gateway_session("http://11.220.0.1/status", policy, fetch=fake_fetch)
         assert seen == [("http://11.220.0.1/status", policy)]
+        assert info.username == "UIBMX5SUY3"
+
+    def _queued_fetch(
+        self, documents: list[FetchedDocument]
+    ) -> tuple[list[str], Callable[[str, AcquisitionPolicy], FetchedDocument]]:
+        queue = list(documents)
+        seen: list[str] = []
+
+        def fake_fetch(url: str, policy: AcquisitionPolicy) -> FetchedDocument:
+            seen.append(url)
+            return queue.pop(0)
+
+        return seen, fake_fetch
+
+    def test_shell_page_is_followed_one_level_to_the_session_view(self) -> None:
+        billing_url = "https://asp.billnasi.com/endpoints/status?username=UIBMX5SUY3"
+        seen, fake_fetch = self._queued_fetch(
+            [
+                FetchedDocument(
+                    final_url="http://11.220.0.1/status",
+                    status_code=200,
+                    headers={},
+                    body=SHELL_HTML,
+                ),
+                FetchedDocument(
+                    final_url=billing_url,
+                    status_code=200,
+                    headers={},
+                    body=BILLING_HTML,
+                ),
+            ]
+        )
+        policy = AcquisitionPolicy(authorized=True)
+        info = fetch_gateway_session("http://11.220.0.1/status", policy, fetch=fake_fetch)
+        assert seen == ["http://11.220.0.1/status", billing_url]
+        assert info.username == "UIBMX5SUY3"
+        assert info.plan is None
+        assert info.limits_unassigned
+        assert info.source_url == billing_url
+
+    def test_iframe_fetch_failure_degrades_to_url_username(self) -> None:
+        billing_url = "https://asp.billnasi.com/endpoints/status?username=UIBMX5SUY3"
+        seen: list[str] = []
+
+        def fake_fetch(url: str, policy: AcquisitionPolicy) -> FetchedDocument:
+            seen.append(url)
+            if url == "http://11.220.0.1/status":
+                return FetchedDocument(
+                    final_url=url, status_code=200, headers={}, body=SHELL_HTML
+                )
+            raise ConnectionError("billing endpoint unreachable")
+
+        policy = AcquisitionPolicy(authorized=True)
+        info = fetch_gateway_session("http://11.220.0.1/status", policy, fetch=fake_fetch)
+        assert seen == ["http://11.220.0.1/status", billing_url]
+        assert info.username == "UIBMX5SUY3"
+        assert info.mac is None
+        assert not info.limits_unassigned
+        assert info.source_url == billing_url
+
+    def test_iframe_without_username_param_returns_empty_session(self) -> None:
+        seen, fake_fetch = self._queued_fetch(
+            [
+                FetchedDocument(
+                    final_url="http://11.220.0.1/status",
+                    status_code=200,
+                    headers={},
+                    body=SHELL_HTML.replace("?username=UIBMX5SUY3", ""),
+                ),
+                FetchedDocument(
+                    final_url="https://asp.billnasi.com/endpoints/status",
+                    status_code=200,
+                    headers={},
+                    body="<html><body>no session</body></html>",
+                ),
+            ]
+        )
+        policy = AcquisitionPolicy(authorized=True)
+        info = fetch_gateway_session("http://11.220.0.1/status", policy, fetch=fake_fetch)
+        assert len(seen) == 2
+        assert not info.active
+
+    def test_non_http_iframe_is_not_followed(self) -> None:
+        seen: list[str] = []
+
+        def fake_fetch(url: str, policy: AcquisitionPolicy) -> FetchedDocument:
+            seen.append(url)
+            return FetchedDocument(
+                final_url=url,
+                status_code=200,
+                headers={},
+                body=SHELL_HTML.replace(
+                    "https://asp.billnasi.com/endpoints/status?username=UIBMX5SUY3",
+                    "javascript:void(0)",
+                ),
+            )
+
+        policy = AcquisitionPolicy(authorized=True)
+        info = fetch_gateway_session("http://11.220.0.1/status", policy, fetch=fake_fetch)
+        assert seen == ["http://11.220.0.1/status"]
+        assert not info.active
+
+    def test_iframe_follow_stops_at_one_level(self) -> None:
+        billing_url = "https://asp.billnasi.com/endpoints/status?username=UIBMX5SUY3"
+        nested = BILLING_HTML.replace(
+            "<table style=' border-collapse: collapse;'>",
+            "<iframe src=\"https://asp.billnasi.com/endpoints/other\"></iframe>"
+            "<table style=' border-collapse: collapse;'>",
+        )
+        seen, fake_fetch = self._queued_fetch(
+            [
+                FetchedDocument(
+                    final_url="http://11.220.0.1/status",
+                    status_code=200,
+                    headers={},
+                    body=SHELL_HTML,
+                ),
+                FetchedDocument(
+                    final_url=billing_url, status_code=200, headers={}, body=nested
+                ),
+            ]
+        )
+        policy = AcquisitionPolicy(authorized=True)
+        info = fetch_gateway_session("http://11.220.0.1/status", policy, fetch=fake_fetch)
+        assert len(seen) == 2  # the nested iframe inside the view is not followed
         assert info.username == "UIBMX5SUY3"
