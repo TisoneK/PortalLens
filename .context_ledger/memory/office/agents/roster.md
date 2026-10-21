@@ -53,7 +53,6 @@ is your stable session tag.
 | Name | Codename | Model | Doing | Status | Status detail |
 |------|----------|-------|-------|--------|---------------|
 | Nadia | S002 | unknown (the harness does not expose a model id) | Dev environment bring-up: install the project's dependencies and verify the suite runs | Done | Shipped: `.venv` built and `pip install -e ".[dev]"` clean on Python 3.14.7; CLI runs, 378/378 tests pass |
-| Kwame | S003 | unknown (the harness does not expose a model id) | Development: automate the diagnosis the S003 manual session performed (local network snapshot, gateway status fetch with perturbation guard, payment-code recognition) | Done | Shipped: `a5d95ce` — snapshot + guarded `--gateway-status` fetch + two session-view checks (ADR-28); 420 tests, ruff + mypy clean |
 
 **Keep your Status cells current — that is what the board is for.** The
 next live worker reads it to know at a glance what a peer has finished,
