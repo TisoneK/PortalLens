@@ -44,6 +44,15 @@ from portallens.evidence import Evidence, EvidenceType
 from portallens.portal import SecurityFinding
 from portallens.security.checks import run_checks
 from portallens.wifi.captive_portal import CaptivePortalProbeResult
+from portallens.wifi.gateway_status import (
+    GatewaySessionInfo,
+    matches_payment_code_shape,
+)
+from portallens.wifi.local_snapshot import (
+    LocalNetworkSnapshot,
+    snapshot_from_journal,
+    snapshot_to_journal,
+)
 
 
 class WatchSampleState(str, Enum):
@@ -110,6 +119,9 @@ class WatchSample:
     evidence: tuple[Evidence, ...] = ()
     portal_claim: PortalClaim | None = None
     note: str | None = None
+    snapshot: LocalNetworkSnapshot | None = None
+    gateway_session: GatewaySessionInfo | None = None
+    gateway_fetch_perturbed: bool | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.state, WatchSampleState):
@@ -147,6 +159,11 @@ _POST_EXPIRY_EVIDENCE_KEY = "watch:post-expiry-access"
 _EXPIRED_SESSION_EVIDENCE_KEY = "watch:expired-session-reported"
 _TRANSITION_EVIDENCE_KEY = "watch:state-transition"
 _PORTAL_MISMATCH_EVIDENCE_KEY = "watch:portal-claim-mismatch"
+_GATEWAY_SESSION_KEY = "watch:gateway-session-active"
+_GATEWAY_SESSION_NO_PLAN_KEY = "watch:gateway-session-no-plan"
+_GATEWAY_SESSION_PAYMENT_CODE_KEY = "watch:gateway-session-username-payment-code-shape"
+_GATEWAY_STATUS_FETCH_KEY = "watch:gateway-status-fetch"
+_GATEWAY_STATUS_PERTURBATION_KEY = "watch:gateway-status-perturbation"
 
 #: Claims that contradict verified internet access.
 _NO_PACKAGE_CLAIMS = frozenset({PortalClaim.PURCHASE_REQUIRED, PortalClaim.LOGIN_REQUIRED})
@@ -242,13 +259,22 @@ class ConnectivityWatch:
         at: datetime | None = None,
         portal_claim: PortalClaim | None = None,
         note: str | None = None,
+        snapshot: LocalNetworkSnapshot | None = None,
+        gateway_session: GatewaySessionInfo | None = None,
+        gateway_fetch_perturbed: bool | None = None,
     ) -> WatchSample:
-        """Fold one bounded probe result into the watched history."""
+        """Fold one bounded probe result into the watched history.
+
+        ``gateway_session`` / ``gateway_fetch_perturbed`` describe an
+        authorized gateway status fetch the caller bracketed around this
+        probe (see ADR-28); the watch only records what it was told — the
+        network behaviour stays the caller's.
+        """
 
         metadata = result.metadata
         sample = WatchSample(
             epoch=self._epoch,
-            state=_sample_state(result),
+            state=probe_state(result),
             profile_name=result.profile_name,
             observed_at=at or self._clock(),
             portal_url=result.portal_url,
@@ -257,6 +283,9 @@ class ConnectivityWatch:
             evidence=result.evidence,
             portal_claim=portal_claim,
             note=note,
+            snapshot=snapshot,
+            gateway_session=gateway_session,
+            gateway_fetch_perturbed=gateway_fetch_perturbed,
         )
         self._samples.append(sample)
         return sample
@@ -269,6 +298,7 @@ class ConnectivityWatch:
         evidence.extend(_post_expiry_evidence(self._samples, self._boundaries, self._target))
         evidence.extend(_expired_session_evidence(self._samples, self._target))
         evidence.extend(_portal_claim_mismatch_evidence(self._samples, self._target))
+        evidence.extend(_gateway_session_evidence(self._samples, self._target))
         findings = run_checks(evidence)
         notes = [
             "Billing milestones are user-recorded annotations: a read-only "
@@ -278,6 +308,12 @@ class ConnectivityWatch:
             "unrestricted response — internet reachability was verified for "
             "that sample, not inferred.",
         ]
+        if any(s.gateway_session is not None for s in self._samples):
+            notes.append(
+                "The gateway session view comes from an authorized fetch of "
+                "the hotspot status page, bracketed by connectivity probes; "
+                "if the fetch perturbed the session the report says so."
+            )
         return AccessWatchReport(
             target=self._target,
             samples=tuple(self._samples),
@@ -315,6 +351,9 @@ class ConnectivityWatch:
                     "can_extend_session": s.can_extend_session,
                     "portal_claim": s.portal_claim.value if s.portal_claim else None,
                     "note": s.note,
+                    "snapshot": snapshot_to_journal(s.snapshot) if s.snapshot else None,
+                    "gateway_session": _session_to_journal(s.gateway_session),
+                    "gateway_fetch_perturbed": s.gateway_fetch_perturbed,
                 }
                 for s in self._samples
             ],
@@ -337,7 +376,7 @@ class ConnectivityWatch:
 
         data = _journal_mapping(payload)
         version = data.get("version")
-        if version != JOURNAL_VERSION:
+        if version not in _SUPPORTED_JOURNAL_VERSIONS:
             raise ValueError(
                 f"unsupported watch journal version {version!r} "
                 f"(this build writes version {JOURNAL_VERSION})"
@@ -378,12 +417,19 @@ class ConnectivityWatch:
                     can_extend_session=_optional_bool_value(item.get("can_extend_session")),
                     portal_claim=_portal_claim_value(item.get("portal_claim")),
                     note=_optional_str(item.get("note"), "note"),
+                    snapshot=_journal_snapshot(item.get("snapshot")),
+                    gateway_session=_journal_gateway_session(item.get("gateway_session")),
+                    gateway_fetch_perturbed=_optional_bool_value(
+                        item.get("gateway_fetch_perturbed")
+                    ),
                 )
             )
         return watch
 
 
-def _sample_state(result: CaptivePortalProbeResult) -> WatchSampleState:
+def probe_state(result: CaptivePortalProbeResult) -> WatchSampleState:
+    """Classify one bounded probe outcome (the watch's normalization)."""
+
     if result.captive is True:
         return WatchSampleState.CAPTIVE
     if result.captive is False:
@@ -534,6 +580,103 @@ def _expired_session_evidence(
     return tuple(evidence)
 
 
+def _gateway_session_evidence(
+    samples: list[WatchSample],
+    target: str | None,
+) -> tuple[Evidence, ...]:
+    """Evaluate the gateway's own session view, recorded by an authorized fetch.
+
+    The temporal/billing logic stays in code (the registry stays
+    evidence-keyed): an active session with an empty plan and every limit
+    "Not assigned" is the signature of access with no purchased package
+    enforcing it; a username in a payment-transaction-code shape suggests the
+    billing integration named the session after a payment. Both are emitted
+    as evidence and the checks registry turns them into findings.
+    """
+
+    evidence: list[Evidence] = []
+    for sample in samples:
+        session = sample.gateway_session
+        if session is None:
+            continue
+        if not session.active:
+            continue
+        evidence.append(
+            _watch_evidence(
+                target,
+                _GATEWAY_SESSION_KEY,
+                session.username or "unknown",
+                (
+                    "The gateway's hotspot status page shows an active session "
+                    f"for username {session.username!r} (plan: "
+                    f"{session.plan or '(empty)'}; session-left: {session.session_left!r}; "
+                    f"expires-on: {session.expires_on!r}; bytes-left: {session.bytes_left!r})."
+                ),
+                observed_at=sample.observed_at,
+            )
+        )
+        if sample.gateway_fetch_perturbed is True:
+            evidence.append(
+                _watch_evidence(
+                    target,
+                    _GATEWAY_STATUS_PERTURBATION_KEY,
+                    "classification_changed",
+                    (
+                        "The connectivity classification changed across the "
+                        "gateway status fetch: the fetch may have perturbed "
+                        "(reset or re-issued) the hotspot session. Treat the "
+                        "session fields above as post-perturbation state."
+                    ),
+                    observed_at=sample.observed_at,
+                )
+            )
+        else:
+            evidence.append(
+                _watch_evidence(
+                    target,
+                    _GATEWAY_STATUS_FETCH_KEY,
+                    "no_classification_change",
+                    (
+                        "The connectivity classification was unchanged across "
+                        "the gateway status fetch — this fetch did not visibly "
+                        "perturb the hotspot session."
+                    ),
+                    observed_at=sample.observed_at,
+                )
+            )
+        if session.plan is None and session.limits_unassigned:
+            evidence.append(
+                _watch_evidence(
+                    target,
+                    _GATEWAY_SESSION_NO_PLAN_KEY,
+                    session.username or "unknown",
+                    (
+                        "The gateway holds an active hotspot session with no "
+                        "plan attached and every limit 'Not assigned' — traffic "
+                        "is authorized with no time or byte cap from a purchased "
+                        "package."
+                    ),
+                    observed_at=sample.observed_at,
+                )
+            )
+        if matches_payment_code_shape(session.username):
+            evidence.append(
+                _watch_evidence(
+                    target,
+                    _GATEWAY_SESSION_PAYMENT_CODE_KEY,
+                    session.username or "",
+                    (
+                        "The session username has a payment-transaction-code "
+                        "shape (10 uppercase alphanumerics, e.g. a mobile-money "
+                        "receipt code) — a format inference suggesting the "
+                        "billing integration named the session after a payment."
+                    ),
+                    observed_at=sample.observed_at,
+                )
+            )
+    return tuple(evidence)
+
+
 def _watch_evidence(
     target: str | None,
     key: str,
@@ -552,7 +695,9 @@ def _watch_evidence(
     )
 
 
-JOURNAL_VERSION = 1
+JOURNAL_VERSION = 2
+#: Journals written by earlier builds (probe/claim/note only) remain readable.
+_SUPPORTED_JOURNAL_VERSIONS = (1, 2)
 
 
 def default_watch_journal_path() -> str:
@@ -597,6 +742,46 @@ def save_watch_journal(path: str | os.PathLike[str], watch: ConnectivityWatch) -
     staging = journal.with_name(journal.name + ".tmp")
     staging.write_text(json.dumps(watch.to_journal(), indent=2) + "\n", encoding="utf-8")
     os.replace(staging, journal)
+
+
+def _journal_snapshot(value: object) -> LocalNetworkSnapshot | None:
+    if value is None:
+        return None
+    return snapshot_from_journal(value)
+
+
+def _session_to_journal(session: GatewaySessionInfo | None) -> dict[str, object] | None:
+    if session is None:
+        return None
+    return {
+        "username": session.username,
+        "mac": session.mac,
+        "ip": session.ip,
+        "plan": session.plan,
+        "start_time": session.start_time,
+        "session_left": session.session_left,
+        "expires_on": session.expires_on,
+        "bytes_left": session.bytes_left,
+        "source_url": session.source_url,
+    }
+
+
+def _journal_gateway_session(value: object) -> GatewaySessionInfo | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("watch journal gateway_session must be an object or null")
+    return GatewaySessionInfo(
+        username=_optional_str(value.get("username"), "gateway_session.username"),
+        mac=_optional_str(value.get("mac"), "gateway_session.mac"),
+        ip=_optional_str(value.get("ip"), "gateway_session.ip"),
+        plan=_optional_str(value.get("plan"), "gateway_session.plan"),
+        start_time=_optional_str(value.get("start_time"), "gateway_session.start_time"),
+        session_left=_optional_str(value.get("session_left"), "gateway_session.session_left"),
+        expires_on=_optional_str(value.get("expires_on"), "gateway_session.expires_on"),
+        bytes_left=_optional_str(value.get("bytes_left"), "gateway_session.bytes_left"),
+        source_url=_optional_str(value.get("source_url"), "gateway_session.source_url") or "",
+    )
 
 
 def _journal_mapping(value: object) -> Mapping[object, object]:
@@ -676,5 +861,6 @@ __all__ = [
     "WatchTransition",
     "default_watch_journal_path",
     "load_watch_journal",
+    "probe_state",
     "save_watch_journal",
 ]

@@ -21,9 +21,43 @@ from portallens.wifi.captive_portal import (
     CaptivePortalDetector,
     CaptivePortalResponse,
 )
+from portallens.wifi.gateway_status import GatewaySessionInfo
+from portallens.wifi.local_snapshot import LocalNetworkSnapshot
 
 UNRESTRICTED_BODY = "Microsoft NCSI"
 PORTAL_URL = "http://maz.wifi/login?dst=http%3A%2F%2Fwww.msftconnecttest.com%2Fredirect"
+
+
+@pytest.fixture(autouse=True)
+def _no_real_host_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every watch test hermetic: no real netsh/ipconfig/arp on the host."""
+
+    monkeypatch.setattr("portallens.cli._watch_snapshot", lambda: None)
+
+
+def _fixture_snapshot() -> LocalNetworkSnapshot:
+    return LocalNetworkSnapshot(
+        ssid="KITENGELA@10",
+        interface="Wi-Fi",
+        client_ipv4="11.220.2.109",
+        gateway_ipv4="11.220.0.1",
+        gateway_mac="DC:2C:6E:00:06:8C",
+        gateway_vendor="MikroTik",
+    )
+
+
+def _fixture_session() -> GatewaySessionInfo:
+    return GatewaySessionInfo(
+        username="UIBMX5SUY3",
+        mac="98:AF:65:7C:6A:69",
+        ip="11.220.2.109",
+        plan=None,
+        start_time=None,
+        session_left="Not assigned *",
+        expires_on="Not assigned *",
+        bytes_left="Not assigned *",
+        source_url="http://11.220.0.1/status",
+    )
 
 
 def _detector(*responses: CaptivePortalResponse) -> CaptivePortalDetector:
@@ -272,3 +306,119 @@ class TestPortalClaim:
         assert result.exit_code == 0, result.output
         assert "portal_claim_mismatch" not in result.output
         assert "Findings raised: none" in result.output
+
+
+class TestGatewayStatus:
+    def _patch_context(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        *responses: CaptivePortalResponse,
+        session: GatewaySessionInfo | None = None,
+        fetch_error: Exception | None = None,
+        snapshot: LocalNetworkSnapshot | None = None,
+    ) -> None:
+        _patch_detector(monkeypatch, _detector(*responses))
+        monkeypatch.setattr("portallens.cli._watch_snapshot", lambda: snapshot)
+
+        def fake_fetch(url: str, policy: object) -> GatewaySessionInfo:
+            assert url == "http://11.220.0.1/status"
+            if fetch_error is not None:
+                raise fetch_error
+            assert session is not None
+            return session
+
+        monkeypatch.setattr("portallens.cli._gateway_status_fetch", fake_fetch)
+
+    def test_guarded_fetch_records_session_and_findings(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(
+            monkeypatch,
+            _unrestricted(),
+            _unrestricted(),
+            session=_fixture_session(),
+            snapshot=_fixture_snapshot(),
+        )
+        result = _watch(CliRunner(), journal, "--target", "KITENGELA@10", "--gateway-status", "--authorized")
+        assert result.exit_code == 0, result.output
+        assert "gateway_session_without_plan" in result.output
+        assert "session_username_payment_code_shape" in result.output
+        assert "Local network" in result.output
+        assert "Gateway session view" in result.output
+
+        stored = json.loads(journal.read_text(encoding="utf-8"))
+        sample = stored["samples"][0]
+        assert sample["snapshot"]["ssid"] == "KITENGELA@10"
+        assert sample["gateway_session"]["username"] == "UIBMX5SUY3"
+        assert sample["gateway_fetch_perturbed"] is False
+
+    def test_classification_change_is_recorded_as_perturbation(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(
+            monkeypatch,
+            _unrestricted(),
+            _captive(),
+            session=_fixture_session(),
+            snapshot=_fixture_snapshot(),
+        )
+        result = _watch(CliRunner(), journal, "--gateway-status", "--authorized")
+        assert result.exit_code == 0, result.output
+        assert "watch:gateway-status-perturbation" in result.output
+
+        stored = json.loads(journal.read_text(encoding="utf-8"))
+        assert stored["samples"][0]["gateway_fetch_perturbed"] is True
+
+    def test_missing_gateway_is_reported(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_detector(monkeypatch, _detector(_unrestricted()))
+        result = _watch(CliRunner(), journal, "--gateway-status", "--authorized")
+        assert result.exit_code == 2
+        assert "default gateway" in result.output
+        assert not journal.exists()
+
+    def test_gateway_status_refuses_without_authorized(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(monkeypatch, _unrestricted(), snapshot=_fixture_snapshot())
+        result = _watch(CliRunner(), journal, "--gateway-status")
+        assert result.exit_code == 2
+        assert "--authorized" in result.output
+        assert not journal.exists()
+
+    def test_fetch_failure_is_reported_and_nothing_is_recorded(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(
+            monkeypatch,
+            _unrestricted(),
+            fetch_error=ConnectionError("gateway did not answer"),
+            snapshot=_fixture_snapshot(),
+        )
+        result = _watch(CliRunner(), journal, "--gateway-status", "--authorized")
+        assert result.exit_code == 2
+        assert "gateway status fetch failed" in result.output
+        assert not journal.exists()
+
+    def test_session_survives_a_reconnect_epoch(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        runner = CliRunner()
+        self._patch_context(
+            monkeypatch,
+            _unrestricted(),
+            _unrestricted(),
+            session=_fixture_session(),
+            snapshot=_fixture_snapshot(),
+        )
+        first = _watch(runner, journal, "--target", "KITENGELA@10", "--gateway-status", "--authorized")
+        assert first.exit_code == 0, first.output
+
+        self._patch_context(monkeypatch, _unrestricted(), snapshot=_fixture_snapshot())
+        second = _watch(runner, journal, "--reconnect", "--authorized")
+        assert second.exit_code == 0, second.output
+
+        stored = json.loads(journal.read_text(encoding="utf-8"))
+        assert stored["samples"][1]["epoch"] == 1
+        assert stored["samples"][1]["gateway_session"] is None

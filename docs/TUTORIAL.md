@@ -566,12 +566,45 @@ PortalLens does not fetch the portal to check this itself, and that is
 deliberate: on some installations *any* unauthenticated request to the
 portal resets the session, including a request from a second device
 sharing the connection through the same device. Probing it would change
-the thing being measured.
+the thing being measured. The claim stays your recorded observation.
 
-The watch adds no new network behaviour: each run makes one bounded,
-allow-listed connectivity probe of the same kind captive-portal detection
-already uses. It never authenticates, reconnects for you, or reads the
-billing system. Only run it against a network you may test.
+#### Asking the gateway: local facts and the guarded status fetch
+
+The rest of the diagnosis does not have to be manual. Every watch run
+gathers a read-only local network snapshot from facts the host OS
+already knows — SSID, interface, client IP, default gateway, its
+MAC-derived vendor, the DHCP lease, and the DNS servers (Windows first;
+other platforms record nothing rather than guess).
+
+When you want the gateway's side of the story, `--gateway-status`
+(requires `--authorized`) fetches the hotspot's `/status` page — the
+MikroTik session view: username, MAC, IP, plan, start time,
+session-left, expires-on, bytes left:
+
+```bash
+portallens watch --target KITENGELA@10 --gateway-status --authorized
+```
+
+Because an unauthenticated portal request can reset the session, the
+fetch is bracketed by two connectivity probes. If the classification
+changed across the fetch, the report warns that the fetch may have
+perturbed the session and labels the session fields as post-perturbation
+state; if it did not, the report records that the fetch left the
+session visibly unchanged.
+
+The session view feeds two checks. `gateway_session_without_plan` fires
+when the gateway shows an active session with no plan and every limit
+"not assigned" — the shape one old payment explains everything.
+`session_username_payment_code_shape` fires when the session username
+matches the M-Pesa transaction-code shape, i.e. the "account" is a
+receipt, not a profile. Together they answer "why does the network not
+ask me to subscribe?" from the gateway's own page, with the tool doing
+the fetching.
+
+Otherwise the watch adds no new network behaviour: each run makes one
+bounded, allow-listed connectivity probe of the same kind captive-portal
+detection already uses. It never authenticates, reconnects for you, or
+reads the billing system. Only run it against a network you may test.
 
 ---
 

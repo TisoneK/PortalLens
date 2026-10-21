@@ -265,13 +265,76 @@ PORTAL_CLAIM_MISMATCH = SecurityCheck(
 )
 
 
+GATEWAY_SESSION_WITHOUT_PLAN = SecurityCheck(
+    slug="gateway_session_without_plan",
+    title="Gateway hotspot session active with no plan or limits attached",
+    severity=Severity.MEDIUM,
+    impact=(
+        "The gateway's own hotspot status page shows an active session for "
+        "this device with no plan attached and every time/byte limit 'Not "
+        "assigned'. Traffic is authorized with no purchased package enforcing "
+        "an end — the session persists until the gateway drops it, and the "
+        "user is never prompted to subscribe. On a paid hotspot this usually "
+        "means the billing integration created the session without applying "
+        "the purchased profile, or granted a profile-less session directly."
+    ),
+    remediation=(
+        "On the gateway, inspect the hotspot user behind the active session: "
+        "attach the correct profile or drop the session so re-authorization "
+        "requires a valid package. On the billing side, verify a payment "
+        "always maps to a profiled hotspot user and that profile changes "
+        "reach the router's active-session table."
+    ),
+    provenance=Provenance.DOCUMENTED,
+    requires=EvidenceRequirement(
+        types=(EvidenceType.CAPTIVE_PORTAL_STATUS,),
+        keys=("watch:gateway-session-no-plan",),
+        min_matches=1,
+    ),
+    confidence_weights={"watch:gateway-session-no-plan": 85},
+    base_confidence=75,
+)
+
+
+SESSION_USERNAME_PAYMENT_CODE = SecurityCheck(
+    slug="session_username_payment_code_shape",
+    title="Hotspot session username matches a payment-transaction code format",
+    severity=Severity.LOW,
+    impact=(
+        "The hotspot session username has the shape of a mobile-money "
+        "transaction code (10 uppercase alphanumerics, e.g. an M-Pesa "
+        "receipt code). Billing integrations that name the hotspot user "
+        "after the payment tend to carry the code forever — the receipt is "
+        "not a package, so nothing about it expires, and the enforcement "
+        "question shifts entirely to whether a profile with limits was "
+        "attached. This is a format inference, not a billing lookup."
+    ),
+    remediation=(
+        "No gateway action is implied by the format alone. If the finding "
+        "appears together with 'gateway_session_without_plan', treat the "
+        "session as a payment artifact that outlived its package and audit "
+        "the billing integration's user provisioning."
+    ),
+    provenance=Provenance.DOCUMENTED,
+    requires=EvidenceRequirement(
+        types=(EvidenceType.CAPTIVE_PORTAL_STATUS,),
+        keys=("watch:gateway-session-username-payment-code-shape",),
+        min_matches=1,
+    ),
+    confidence_weights={"watch:gateway-session-username-payment-code-shape": 55},
+    base_confidence=45,
+)
+
+
 CHECKS: tuple[SecurityCheck, ...] = (
     CLIENT_FINGERPRINTING,
     CLEARTEXT_LOGIN,
     GATEWAY_ADMIN_EXPOSED,
     GATEWAY_DEFAULT_CREDENTIAL,
+    GATEWAY_SESSION_WITHOUT_PLAN,
     PORTAL_CLAIM_MISMATCH,
     POST_EXPIRY_ACCESS,
+    SESSION_USERNAME_PAYMENT_CODE,
 )
 
 

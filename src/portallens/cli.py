@@ -56,6 +56,8 @@ from portallens.reporting import render_markdown
 if TYPE_CHECKING:
     from portallens.tui.setup import SetupResult
     from portallens.wifi.captive_portal import CaptivePortalDetector
+    from portallens.wifi.gateway_status import GatewaySessionInfo
+    from portallens.wifi.local_snapshot import LocalNetworkSnapshot
     from portallens.wifi.watch import AccessWatchReport
 
 # ---------------------------------------------------------------------------
@@ -745,6 +747,34 @@ def _watch_detector() -> CaptivePortalDetector:
     return CaptivePortalDetector()
 
 
+def _watch_snapshot() -> LocalNetworkSnapshot | None:
+    """Gather the local network snapshot for ``portallens watch``.
+
+    A module-level seam so tests can substitute a fixture. Gathering fails
+    soft (non-Windows host, unavailable command): the watch still records
+    its probe, just without local context.
+    """
+
+    from portallens.wifi.errors import WifiError
+    from portallens.wifi.local_snapshot import collect_local_snapshot
+
+    try:
+        return collect_local_snapshot()
+    except WifiError:
+        return None
+
+
+def _gateway_status_fetch(
+    url: str,
+    policy: AcquisitionPolicy,
+) -> GatewaySessionInfo:
+    """Fetch the gateway hotspot status page (ADR-28) — seam for tests."""
+
+    from portallens.wifi.gateway_status import fetch_gateway_session
+
+    return fetch_gateway_session(url, policy)
+
+
 def _watch_boundary_time(value: str) -> datetime:
     """Parse a user-supplied boundary time; naive input means local time."""
 
@@ -762,6 +792,8 @@ def _watch_boundary_time(value: str) -> datetime:
 def _watch_report_json(report: AccessWatchReport) -> str:
     """Render a watch report as JSON for scripts."""
 
+    from portallens.wifi.local_snapshot import snapshot_to_journal
+
     payload = {
         "target": report.target,
         "notes": list(report.notes),
@@ -778,6 +810,9 @@ def _watch_report_json(report: AccessWatchReport) -> str:
                 "portal_url": s.portal_url,
                 "seconds_remaining": s.seconds_remaining,
                 "can_extend_session": s.can_extend_session,
+                "snapshot": snapshot_to_journal(s.snapshot) if s.snapshot else None,
+                "gateway_session": _gateway_session_payload(s.gateway_session),
+                "gateway_fetch_perturbed": s.gateway_fetch_perturbed,
             }
             for s in report.samples
         ],
@@ -816,6 +851,24 @@ def _watch_report_json(report: AccessWatchReport) -> str:
         ],
     }
     return json.dumps(payload, indent=2, default=str)
+
+
+def _gateway_session_payload(session: GatewaySessionInfo | None) -> dict[str, object] | None:
+    """Serializable form of one parsed gateway session view."""
+
+    if session is None:
+        return None
+    return {
+        "username": session.username,
+        "mac": session.mac,
+        "ip": session.ip,
+        "plan": session.plan,
+        "start_time": session.start_time,
+        "session_left": session.session_left,
+        "expires_on": session.expires_on,
+        "bytes_left": session.bytes_left,
+        "source_url": session.source_url,
+    }
 
 
 @main.command(name="watch")
@@ -863,6 +916,18 @@ def _watch_report_json(report: AccessWatchReport) -> str:
     default=None,
     help="Free-text note for this observation (e.g. 'tethered laptop opened the portal').",
 )
+@click.option(
+    "--gateway-status",
+    "gateway_status",
+    is_flag=True,
+    default=False,
+    help=(
+        "Fetch the gateway's hotspot /status page (MikroTik) between two "
+        "connectivity probes and record the session view it shows. The "
+        "bracketing probes detect whether the fetch perturbed the session. "
+        "Requires --authorized."
+    ),
+)
 @click.option("--target", default=None, help="Label for the watched network (e.g. maz.wifi).")
 @click.option(
     "--journal",
@@ -890,6 +955,7 @@ def watch(
     reconnect: bool,
     portal_claim: str | None,
     observation_note: str | None,
+    gateway_status: bool,
     target: str | None,
     journal_path: str | None,
     output_format: str,
@@ -910,14 +976,21 @@ def watch(
     recorded expiry with no recorded renewal before it. Billing milestones
     are your observations: a read-only tool cannot see the billing system,
     and the report says so.
+
+    With --gateway-status the tool also fetches the gateway's own hotspot
+    session view (an active technique) bracketed by probes, so the report
+    can explain *why* access looks the way it does — and say so if the
+    fetch itself perturbed the session.
     """
 
     from portallens.wifi.captive_portal import PROBE_PROFILES
+    from portallens.wifi.gateway_status import status_url_for_gateway
     from portallens.wifi.watch import (
         PortalClaim,
         WatchBoundaryKind,
         default_watch_journal_path,
         load_watch_journal,
+        probe_state,
         save_watch_journal,
     )
 
@@ -945,16 +1018,47 @@ def watch(
     policy = AcquisitionPolicy(authorized=authorized)
     detector = _watch_detector()
     try:
-        result = detector.probe(profile, policy)
+        result_before = detector.probe(profile, policy)
     except AcquisitionDenied as exc:
         echo(f"Error: {exc}", err=True)
         echo("Re-run with --authorized, and only against a network you may test.", err=True)
         sys.exit(2)
 
+    snapshot = _watch_snapshot()
+
+    gateway_session = None
+    perturbed: bool | None = None
+    if gateway_status:
+        if not authorized:
+            echo(
+                "Error: --gateway-status fetches the gateway's status page "
+                "and requires --authorized.",
+                err=True,
+            )
+            sys.exit(2)
+        if snapshot is None or not snapshot.gateway_ipv4:
+            echo(
+                "Error: --gateway-status needs the default gateway from the "
+                "local network snapshot, and none was found.",
+                err=True,
+            )
+            sys.exit(2)
+        url = status_url_for_gateway(snapshot.gateway_ipv4)
+        try:
+            gateway_session = _gateway_status_fetch(url, policy)
+        except Exception as exc:
+            echo(f"Error: gateway status fetch failed: {exc}", err=True)
+            sys.exit(2)
+        result_after = detector.probe(profile, policy)
+        perturbed = probe_state(result_before) != probe_state(result_after)
+
     watched.record(
-        result,
+        result_before,
         portal_claim=PortalClaim(portal_claim) if portal_claim else None,
         note=observation_note,
+        snapshot=snapshot,
+        gateway_session=gateway_session,
+        gateway_fetch_perturbed=perturbed,
     )
     save_watch_journal(path, watched)
 

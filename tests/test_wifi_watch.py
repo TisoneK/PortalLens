@@ -8,7 +8,10 @@ import pytest
 
 from portallens.evidence import EvidenceType, reset_evidence_ids
 from portallens.wifi.captive_portal import CaptivePortalMetadata, CaptivePortalProbeResult
+from portallens.wifi.gateway_status import GatewaySessionInfo
+from portallens.wifi.local_snapshot import LocalNetworkSnapshot
 from portallens.wifi.watch import (
+    JOURNAL_VERSION,
     AccessWatchReport,
     ConnectivityWatch,
     PortalClaim,
@@ -17,6 +20,7 @@ from portallens.wifi.watch import (
     WatchSample,
     WatchSampleState,
     WatchTransition,
+    probe_state,
 )
 
 T0 = datetime(2026, 10, 20, 12, 0, 0, tzinfo=timezone.utc)
@@ -363,3 +367,160 @@ class TestPortalClaim:
             sample.pop("note", None)
         rebuilt = ConnectivityWatch.from_journal(payload)
         assert rebuilt.samples[0].portal_claim is None
+
+
+def _session(**overrides: object) -> GatewaySessionInfo:
+    values: dict[str, object] = {
+        "username": "UIBMX5SUY3",
+        "mac": "98:AF:65:7C:6A:69",
+        "ip": "11.220.2.109",
+        "plan": None,
+        "start_time": None,
+        "session_left": "Not assigned *",
+        "expires_on": "Not assigned *",
+        "bytes_left": "Not assigned *",
+        "source_url": "http://11.220.0.1/status",
+    }
+    values.update(overrides)
+    return GatewaySessionInfo(**values)  # type: ignore[arg-type]
+
+
+def _snapshot() -> LocalNetworkSnapshot:
+    return LocalNetworkSnapshot(
+        ssid="KITENGELA@10",
+        interface="Wi-Fi",
+        client_ipv4="11.220.2.109",
+        gateway_ipv4="11.220.0.1",
+        gateway_mac="DC:2C:6E:00:06:8C",
+        gateway_vendor="MikroTik",
+        observed_at=T0,
+    )
+
+
+class TestJournalVersions:
+    def test_current_journal_is_version_two(self) -> None:
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0)
+        assert watch.to_journal()["version"] == JOURNAL_VERSION == 2
+
+    def test_version_one_journal_still_loads(self) -> None:
+        legacy = {
+            "version": 1,
+            "target": "maz.wifi",
+            "epoch": 0,
+            "boundaries": [],
+            "samples": [
+                {
+                    "epoch": 0,
+                    "state": "unrestricted",
+                    "profile_name": "windows-ncsi",
+                    "observed_at": T0.isoformat(),
+                }
+            ],
+        }
+        rebuilt = ConnectivityWatch.from_journal(legacy)
+        assert rebuilt.samples[0].state is WatchSampleState.UNRESTRICTED
+        assert rebuilt.samples[0].snapshot is None
+        assert rebuilt.samples[0].gateway_session is None
+
+    def test_unknown_version_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="unsupported watch journal version"):
+            ConnectivityWatch.from_journal({"version": 99})
+
+
+class TestLocalSnapshotOnSamples:
+    def test_snapshot_roundtrips_through_the_journal(self) -> None:
+        watch = ConnectivityWatch(target="KITENGELA@10")
+        watch.record(_result(False), at=T0, snapshot=_snapshot())
+        rebuilt = ConnectivityWatch.from_journal(watch.to_journal())
+        assert rebuilt.samples[0].snapshot == _snapshot()
+
+    def test_sample_without_snapshot_stays_none(self) -> None:
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0)
+        assert watch.to_journal()["samples"][0]["snapshot"] is None  # type: ignore[index]
+
+
+class TestGatewaySessionEvidence:
+    def test_no_plan_session_raises_both_findings(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch(target="KITENGELA@10")
+        watch.record(
+            _result(False),
+            at=T0,
+            snapshot=_snapshot(),
+            gateway_session=_session(),
+            gateway_fetch_perturbed=False,
+        )
+        report = watch.report()
+        keys = {e.key for e in report.evidence}
+        assert "watch:gateway-session-active" in keys
+        assert "watch:gateway-session-no-plan" in keys
+        assert "watch:gateway-session-username-payment-code-shape" in keys
+        assert "watch:gateway-status-fetch" in keys
+        slugs = {f.check_slug for f in report.findings}
+        assert slugs == {"gateway_session_without_plan", "session_username_payment_code_shape"}
+
+    def test_unperturbed_fetch_records_verification_evidence(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, gateway_session=_session(), gateway_fetch_perturbed=False)
+        report = watch.report()
+        (fetch,) = [e for e in report.evidence if e.key == "watch:gateway-status-fetch"]
+        assert fetch.value == "no_classification_change"
+
+    def test_perturbed_fetch_records_perturbation_evidence(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, gateway_session=_session(), gateway_fetch_perturbed=True)
+        report = watch.report()
+        assert not any(e.key == "watch:gateway-status-fetch" for e in report.evidence)
+        (perturb,) = [e for e in report.evidence if e.key == "watch:gateway-status-perturbation"]
+        assert "perturbed" in (perturb.note or "")
+
+    def test_profiled_session_has_no_no_plan_evidence(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=_session(
+                plan="1 Day", session_left="23h59m", expires_on="2026-10-22", bytes_left="4 GB"
+            ),
+        )
+        report = watch.report()
+        keys = {e.key for e in report.evidence}
+        assert "watch:gateway-session-active" in keys
+        assert "watch:gateway-session-no-plan" not in keys
+        assert "watch:gateway-session-username-payment-code-shape" in keys
+        assert [f.check_slug for f in report.findings] == ["session_username_payment_code_shape"]
+
+    def test_non_payment_username_has_no_format_finding(self) -> None:
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=_session(username="wifikwame", plan="1 Day",
+                                     session_left="23h59m", expires_on="2026-10-22", bytes_left="4 GB"),
+        )
+        report = watch.report()
+        assert report.findings == ()
+
+    def test_session_and_perturbation_roundtrip_through_the_journal(self) -> None:
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, gateway_session=_session(), gateway_fetch_perturbed=True)
+        rebuilt = ConnectivityWatch.from_journal(watch.to_journal())
+        sample = rebuilt.samples[0]
+        assert sample.gateway_session == _session()
+        assert sample.gateway_fetch_perturbed is True
+
+    def test_report_mentions_the_fetch_in_notes(self) -> None:
+        watch = ConnectivityWatch()
+        watch.record(_result(False), at=T0, gateway_session=_session())
+        assert any("bracketed" in note for note in watch.report().notes)
+
+    def test_probe_state_export_matches_record_classification(self) -> None:
+        watch = ConnectivityWatch()
+        sample = watch.record(_result(False), at=T0)
+        assert probe_state(_result(False)) is sample.state

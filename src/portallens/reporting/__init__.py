@@ -342,6 +342,57 @@ def render_watch_markdown(
         lines.append("No free-text notes recorded.")
     lines.append("")
 
+    snapshots = [s.snapshot for s in report.samples if s.snapshot is not None]
+    lines.append("## Local network (latest sample)")
+    lines.append("")
+    if snapshots:
+        latest = snapshots[-1]
+        lines.append("| Fact | Value |")
+        lines.append("|---|---|")
+        lines.append(f"| SSID | {latest.ssid or '(unknown)'} |")
+        lines.append(f"| Interface | {latest.interface or '(unknown)'} |")
+        lines.append(f"| Client IPv4 | {latest.client_ipv4 or '(unknown)'} |")
+        vendor = f" ({latest.gateway_vendor})" if latest.gateway_vendor else ""
+        mac = latest.gateway_mac or "(unknown)"
+        lines.append(f"| Gateway | {latest.gateway_ipv4 or '(unknown)'} {mac}{vendor} |")
+        obtained = latest.dhcp_lease_obtained.isoformat() if latest.dhcp_lease_obtained else "(unknown)"
+        expires = latest.dhcp_lease_expires.isoformat() if latest.dhcp_lease_expires else "(unknown)"
+        lines.append(f"| DHCP lease | obtained {obtained} - expires {expires} |")
+        dns = ", ".join(latest.dns_servers) if latest.dns_servers else "(unknown)"
+        lines.append(f"| DNS servers | {dns} |")
+    else:
+        lines.append("No local network snapshot recorded (host facts unavailable).")
+    lines.append("")
+
+    sessions = [s for s in report.samples if s.gateway_session is not None]
+    lines.append("## Gateway session view (authorized status fetch)")
+    lines.append("")
+    if sessions:
+        for sample in sessions:
+            session = sample.gateway_session
+            assert session is not None
+            lines.append(f"- Observed at {sample.observed_at.isoformat()}:")
+            lines.append(f"  - Username: `{session.username or '(none)'}`")
+            lines.append(f"  - Device: {session.mac or '(unknown)'} / {session.ip or '(unknown)'}")
+            lines.append(f"  - Plan: {session.plan or '(empty)'}")
+            limits = (
+                f"session-left {session.session_left or '?'}, "
+                f"expires-on {session.expires_on or '?'}, "
+                f"bytes-left {session.bytes_left or '?'}"
+            )
+            lines.append(f"  - Limits: {limits}")
+            if sample.gateway_fetch_perturbed is True:
+                lines.append(
+                    "  - **The classification changed across this fetch — the "
+                    "fetch may have perturbed the hotspot session.**"
+                )
+    else:
+        lines.append(
+            "No gateway status fetch recorded. Re-run with `--gateway-status "
+            "--authorized` to capture the gateway's own session view."
+        )
+    lines.append("")
+
     lines.append("## How to read this report")
     lines.append("")
     lines.append(
