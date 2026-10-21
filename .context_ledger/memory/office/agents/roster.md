@@ -53,7 +53,6 @@ is your stable session tag.
 | Name | Codename | Model | Doing | Status | Status detail |
 |------|----------|-------|-------|--------|---------------|
 | Nadia | S002 | unknown (the harness does not expose a model id) | Dev environment bring-up: install the project's dependencies and verify the suite runs | Done | Shipped: `.venv` built and `pip install -e ".[dev]"` clean on Python 3.14.7; CLI runs, 378/378 tests pass |
-| Kwame | S003 | unknown (the harness does not expose a model id) | Diagnose why no subscription has been made lately on the currently connected portal network, using PortalLens | Done | Diagnosed: gateway session `UIBMX5SUY3` (user's M-Pesa code) has no plan/limits — one old payment, unexpiring session; user to verify code date in M-Pesa history; commits await push |
 
 **Keep your Status cells current — that is what the board is for.** The
 next live worker reads it to know at a glance what a peer has finished,

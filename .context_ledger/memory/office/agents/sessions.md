@@ -57,3 +57,4 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Open items:** user-side verification — find `UIBMX5SUY3` in the M-Pesa history to date the true last payment; backlog candidate recorded in the notes (a `no_plan_active_session` finding for sessions with no limits attached, complementing `portal_claim_mismatch`).
 - **Notes:** `.context_ledger/memory/office/sessions/2026-10-21-3/notes.md`
 - **Report:** none (diagnostic session — findings in the notes file and watch journal)
+- **Push status (appended correction at clock-out):** all three commits — `cbd83d4`, `ff9b564`, `dd245e5` — pushed once the user lifted the auto-mode block; clock-out is the fourth.
