@@ -47,3 +47,13 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Open items:** none. Worth noting for whoever next touches the toolchain config: the interpreter here is 3.14.7 while `pyproject.toml` declares `requires-python >=3.10` and `[tool.mypy]` pins `python_version = "3.10"`, so mypy is checking a 3.10 target against a 3.14 runtime — fine today, but a future 3.14-only stdlib change would surface as a mypy/runtime mismatch rather than a test failure.
 - **Notes:** none
 - **Report:** none (environment session — no product or design change to review)
+
+---
+## 2026-10-21 — Session 3
+- **Agent:** Kwame | **Model:** unknown (the harness does not expose a model id) | **Platform:** Tisone's Windows workstation (local) | **Role:** engineer | **Core:** 2.2.0
+- **Task:** Diagnose why Tisone has not needed a subscription lately on the currently connected portal network (KITENGELA@10), using PortalLens.
+- **Commits:** 2 (`cbd83d4` check-in + this closing commit; both await push — auto mode blocks pushes, user action required)
+- **Outcome:** done — `portallens watch` verified unrestricted access across 3 samples on KITENGELA@10 (MikroTik gateway 11.220.0.1, lease held since 2026-10-19 19:05 EAT). The user-fetched `/status` page shows an active session `UIBMX5SUY3` with empty plan and all limits "Not assigned"; the user identifies that username as one of their M-Pesa transaction codes. Working explanation (~75%): the M-Pesa-integrated billing created the hotspot user from a past payment but attached no plan or limits, so one old payment authorizes access indefinitely (silently re-authenticated via MAC-cookie). Recorded as portal claim + notes in the watch journal.
+- **Open items:** user-side verification — find `UIBMX5SUY3` in the M-Pesa history to date the true last payment; backlog candidate recorded in the notes (a `no_plan_active_session` finding for sessions with no limits attached, complementing `portal_claim_mismatch`).
+- **Notes:** `.context_ledger/memory/office/sessions/2026-10-21-3/notes.md`
+- **Report:** none (diagnostic session — findings in the notes file and watch journal)
