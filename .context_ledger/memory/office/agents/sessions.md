@@ -37,3 +37,13 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Extension (same session, live measurement):** read the operator's own views on `maz.wifi` -- ISPMan `/ispman-paid/select` (price list only), `/usage/payments` ("Nothing here yet"), `/usage/connects` (empty), `/usage/sessions` (7 Sep onward, 78.42 GB all-time) and the MikroTik `/status` page, which reports a `Connected / left` countdown (`2h13m30s / 7m56s`, ticking 1:1 with wall clock, ~2h21m total -- no sold package duration). Verified access was `unrestricted` before and after the portal fetch, so an unauthenticated portal GET does not itself reset the session. Conclusion recorded: access is a re-issued, time-boxed gateway session rather than unlimited free internet. Background watcher started across the budget deadline (01:09:50) to catch the transition.
 
 - **Extension (the renewal, caught live):** the watcher straddled the budget deadline. With 16s left at 01:09:35, the gateway at 01:09:56 reported a brand-new session (`3s / 1h38m19s`) while every connectivity probe stayed `unrestricted` -- no portal, no purchase, no user action. Session 1 (from 22:48:25) held 2h21m26s; the new one expires 02:48:15; the two sum to ~4h from the session start. So the device is spending a 4-hour entitlement in two server-issued sessions, and the portal never shows it. Queued the horizon test at 02:48:15: a third session would prove the grant is unbounded, access falling to the portal would prove the gateway enforces and only the portal's display is wrong.
+
+---
+## 2026-10-21 — Session 2
+- **Agent:** Nadia | **Model:** unknown (the harness does not expose a model id) | **Platform:** Tisone's Windows workstation (local) | **Role:** engineer | **Core:** 2.2.0
+- **Task:** Install the project's dependencies so the repo is runnable locally.
+- **Commits:** 1 (this closing ledger commit; no product code changed)
+- **Outcome:** done — built `.venv` on Python 3.14.7 and installed editable with the `dev` extra per `docs/TUTORIAL.md` (`pip install -e ".[dev]"`, which subsumes `tui`). Everything resolved from wheels, nothing needed a local build toolchain. Verified: `portallens --version` prints 0.1.0 and the full suite is 378/378 green in 26s.
+- **Open items:** none. Worth noting for whoever next touches the toolchain config: the interpreter here is 3.14.7 while `pyproject.toml` declares `requires-python >=3.10` and `[tool.mypy]` pins `python_version = "3.10"`, so mypy is checking a 3.10 target against a 3.14 runtime — fine today, but a future 3.14-only stdlib change would surface as a mypy/runtime mismatch rather than a test failure.
+- **Notes:** none
+- **Report:** none (environment session — no product or design change to review)
