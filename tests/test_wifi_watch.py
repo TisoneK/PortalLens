@@ -248,7 +248,7 @@ class TestReportShape:
     def test_report_carries_honesty_notes(self) -> None:
         watch = ConnectivityWatch()
         report = watch.report()
-        assert any("user-recorded" in note for note in report.notes)
+        assert any("recorded by the operator" in note for note in report.notes)
 
     def test_transition_evidence_mentions_reconnects(self) -> None:
         reset_evidence_ids()

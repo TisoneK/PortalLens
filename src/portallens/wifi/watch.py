@@ -302,8 +302,8 @@ class ConnectivityWatch:
         evidence.extend(_gateway_session_evidence(self._samples, self._target))
         findings = run_checks(evidence)
         notes = [
-            "Billing milestones are user-recorded annotations: a read-only "
-            "watch cannot observe the billing system, so post-expiry "
+            "Billing milestones are annotations recorded by the operator: a "
+            "read-only watch cannot observe the billing system, so post-expiry "
             "findings rest on the accuracy of the recorded boundary times.",
             "An 'unrestricted' sample means the probe received its expected "
             "unrestricted response — internet reachability was verified for "
@@ -525,8 +525,8 @@ def _portal_claim_mismatch_evidence(
     """Flag samples where the portal denied a package while access worked.
 
     This is the signature the tool could not previously see: the gateway
-    authorizes traffic and the portal tells the user to buy, in the same
-    moment. It is recorded from the user's observation, not from a probe,
+    authorizes traffic and the portal tells the operator to buy, in the same
+    moment. It is recorded from an operator observation, not from a probe,
     because requesting the portal can itself reset the session.
     """
 

@@ -389,17 +389,17 @@ def render_watch_markdown(
                 )
     else:
         lines.append(
-            "No gateway status fetch recorded. Re-run with `--gateway-status "
-            "--authorized` to capture the gateway's own session view."
+            "No gateway status fetch recorded. A run with `--gateway-status "
+            "--authorized` captures the gateway's own session view."
         )
     lines.append("")
 
     lines.append("## How to read this report")
     lines.append("")
     lines.append(
-        "- The portal claim is what the portal showed you when you looked; the "
-        "tool does not fetch the portal while measuring, because that request can "
-        "itself reset the hotspot session."
+        "- The portal claim is what the portal showed the operator when they "
+        "looked; the tool does not fetch the portal while measuring, because "
+        "that request can itself reset the hotspot session."
     )
     for note in report.notes:
         lines.append(f"- {note}")
