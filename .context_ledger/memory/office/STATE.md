@@ -5,7 +5,7 @@ at check-in and at exit. This is a DERIVED VIEW for fast orientation;
 open the file a line points at when your task needs more than the
 line gives you. Full reading order: ledger-schema.md. -->
 
-_Regenerated: 2026-10-21T05:38:33Z_
+_Regenerated: 2026-10-21T06:20:31Z_
 
 ## Standing params
 - **Core:** 2.2.0 (locked, verified 2026-10-21)
@@ -16,6 +16,7 @@ _Regenerated: 2026-10-21T05:38:33Z_
 
 ## Office — who's in, right now
 - **Nadia** (S002) — Done — Dev environment bring-up: install the project's dependencies and verify the suite runs
+- **Kwame** (S003) — Done — Development: automate the diagnosis the S003 manual session performed (local network snap…
 
 ## Current task
 - **2026-10-20 — Rhoda / model not exposed by the harness** — completed — added the portal-claim dimension (recorded, never fetched) and the portal_claim_mismatch check — *idle*
@@ -29,7 +30,7 @@ _8 medium, 5 low priority row(s) — see tasks/backlog.md_
 ## Logs at a glance — open only if your task touches these
 - flaws/log.md (protocol/.context_ledger friction): 3 entries, last added 2026-10-20
 - inefficiencies/log.md (project code/env friction): 0 entries
-- plans/decisions.md (ADRs in force — respected, not relitigated): 27 entries, last added 2026-10-21
+- plans/decisions.md (ADRs in force — respected, not relitigated): 28 entries, last added 2026-10-21
 
 ## Collaboration
 (no collaboration/events — collaboration never used)

@@ -58,3 +58,13 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Notes:** `.context_ledger/memory/office/sessions/2026-10-21-3/notes.md`
 - **Report:** none (diagnostic session — findings in the notes file and watch journal)
 - **Push status (appended correction at clock-out):** all three commits — `cbd83d4`, `ff9b564`, `dd245e5` — pushed once the user lifted the auto-mode block; clock-out is the fourth.
+
+---
+## 2026-10-21 — Session 4
+- **Agent:** Kwame (S003, checked back in) | **Model:** unknown (the harness does not expose a model id) | **Platform:** Tisone's Windows workstation (local) | **Role:** engineer | **Core:** 2.2.0
+- **Task:** Automate the manual diagnosis steps from session 3 into the tool — the user: "most of the work was done by you and not the tool… Research is almost over now its time for development." Stance chosen with the user: the tool fetches, with a guard (not "user fetches, tool parses").
+- **Commits:** 1 project commit (`a5d95ce`) + closing ledger commits
+- **Outcome:** done — three slices shipped: (1) read-only local network snapshot on every watch run (SSID, addressing, gateway MAC/vendor via OUI table, DHCP lease, DNS) from host-OS facts, Windows-first; (2) `--gateway-status` (requires `--authorized`) fetches the MikroTik `/status` session view bracketed by two connectivity probes, with perturbation recorded as evidence either way — the validated session-reset hazard made the bracket mandatory; (3) two new evidence-keyed checks: `gateway_session_without_plan` (active session, no plan, all limits unassigned) and `session_username_payment_code_shape` (username matches the M-Pesa transaction-code shape). Journal format v2; v1 journals still load. Design recorded as ADR-28. 420 tests (baseline was 378), ruff + mypy strict clean.
+- **Open items:** next live visit to KITENGELA@10 should re-run `portallens watch --target KITENGELA@10 --gateway-status --authorized` to confirm the tool now reproduces the session-3 findings unaided; session 3's user-side verification (find `UIBMX5SUY3` in M-Pesa history) still stands.
+- **Notes:** `.context_ledger/memory/office/sessions/2026-10-21-4/notes.md`
+- **Report:** none (feature session — ADR-28 plus the notes file)
