@@ -30,6 +30,25 @@ _STATUS_LABELS = frozenset(
 
 _NOT_ASSIGNED = "not assigned"
 
+#: Some operator skins render the same session view as label/value cards
+#: instead of a table, under their own wording. Each label maps onto the
+#: canonical field it carries; labels not listed here are ignored, so an
+#: unrelated card (an amount, a phone number) can never populate a field.
+_CARD_LABELS = {
+    "active username code": "USERNAME",
+    "active username": "USERNAME",
+    "username": "USERNAME",
+    "mac": "MAC",
+    "ip": "IP",
+    "plan": "PLAN",
+    "start-time": "START-TIME",
+    "session-left": "SESSION-LEFT",
+    "bundle will expire in": "SESSION-LEFT",
+    "expires-on": "EXPIRES-ON",
+    "bytes left": "BYTES LEFT",
+    "data balance": "BYTES LEFT",
+}
+
 
 @dataclass(frozen=True)
 class GatewaySessionInfo:
@@ -83,6 +102,8 @@ def parse_mikrotik_status(text: str, *, source_url: str = "") -> GatewaySessionI
 
     looks_like_html = "<" in text and ">" in text
     values = _parse_status_rows(text) if looks_like_html else _parse_status_tokens(text)
+    if looks_like_html and not values:
+        values = _parse_status_cards(text)
 
     return GatewaySessionInfo(
         username=values.get("USERNAME"),
@@ -111,6 +132,40 @@ def _parse_status_rows(html: str) -> dict[str, str | None]:
         value = re.sub(r"<[^>]+>", "", cells[1]).strip()
         values[label] = value if value else None
     return values
+
+
+def _parse_status_cards(html: str) -> dict[str, str | None]:
+    """Read the session view out of a skin that renders label/value cards.
+
+    The card markup pairs a label span (optionally carrying an icon) with
+    the bold value span that follows it. Only labels in
+    :data:`_CARD_LABELS` become fields; an unrecognised card is skipped.
+    """
+
+    values: dict[str, str | None] = {}
+    for label, value in _LABEL_VALUE_SPANS.findall(html):
+        canonical = _CARD_LABELS.get(_normalise_card_label(label))
+        if canonical is None or canonical in values:
+            continue
+        cleaned = value.strip()
+        values[canonical] = cleaned if cleaned else None
+    return values
+
+
+def _normalise_card_label(label: str) -> str:
+    """Lowercase a card label, dropping a trailing colon and extra spaces."""
+
+    return re.sub(r"\s+", " ", label).strip().rstrip(":").strip().lower()
+
+
+#: A label span immediately followed by the bold value span of the same card.
+_LABEL_VALUE_SPANS = re.compile(
+    r"<span[^>]*>"
+    r"(?:\s*<span[^>]*class=[\"'][^\"']*\bfa\b[^\"']*[\"'][^>]*>\s*</span>)?"
+    r"\s*([^<]+?)\s*</span>\s*"
+    r"<span[^>]*class=[\"'][^\"']*font-bold[^\"']*[\"'][^>]*>\s*([^<]*?)\s*</span>",
+    flags=re.IGNORECASE | re.DOTALL,
+)
 
 
 def _iframe_src(html: str) -> str | None:

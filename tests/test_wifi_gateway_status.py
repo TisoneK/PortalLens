@@ -40,6 +40,41 @@ STATUS_HTML = """\
 </body></html>
 """
 
+# A second operator's skin renders the same session view as label/value
+# cards rather than a table, own wording, no PLAN row: the username is the
+# device MAC, the bundle expiry is the time left, and "unlimited" is the
+# data balance. Observed live on WISPMAN PAY TO CONNET.
+CARD_HTML = """\
+<html lang="en"><head><title>Success Login</title></head><body>
+<div class="card2 login">
+  <div class="text-center py-14">
+    <p class="text-white font-bold">Success! You are now connected.</p>
+  </div>
+  <p class="uppercase text-white m-5 py-2">Your Balances</p>
+  <div class="bg-blue-500 flex justify-between m-5 px-3 py-3 text-white">
+    <span class="text-white"><span class="fa fa-envelope px-2"></span>Active Username Code</span>
+    <span class="text-white font-bold">98:AF:65:7C:6A:69</span>
+  </div>
+  <div class="bg-blue-500 flex justify-between m-5 px-3 py-3 text-white">
+    <span class="text-white"><span class="fa fa-envelope px-2"></span>Bundle will expire in</span>
+    <span class="text-white font-bold">8h59m39s</span>
+  </div>
+  <div class="bg-white flex justify-between m-5 px-3 py-3">
+    <span class="text-white text-sm"><span class="fa fa-wifi px-2"></span> Data Balance</span>
+    <span class="text-white font-bold">unlimited</span>
+  </div>
+  <div class="bg-white flex justify-between m-5 px-3 py-3">
+    <span class="text-white text-sm"><span class="fa fa-mobile px-2"></span> bytes up/down:</span>
+    <span class="text-white font-bold">17.2 MiB / 81.5 MiB</span>
+  </div>
+  <div class="bg-white flex justify-between m-5 px-3 py-3">
+    <span class="text-white text-sm"><span class="fa fa-envelope px-2"></span> connected / left:</span>
+    <span class="text-white font-bold">14m23s / 8h59m39s</span>
+  </div>
+</div>
+</body></html>
+"""
+
 STATUS_TEXT = (
     "TITLE VALUE USERNAME UIBMX5SUY3 MAC 98:AF:65:7C:6A:69 IP 11.220.2.109 "
     "PLAN START-TIME SESSION-LEFT Not assigned * EXPIRES-ON Not assigned * "
@@ -173,6 +208,26 @@ class TestBillingTemplate:
     def test_shell_page_alone_is_not_a_session(self) -> None:
         info = parse_mikrotik_status(SHELL_HTML)
         assert not info.active
+
+
+class TestCardTemplate:
+    def test_label_value_cards_parse_like_the_table(self) -> None:
+        info = parse_mikrotik_status(CARD_HTML, source_url="http://10.30.0.1/status")
+        assert info.username == "98:AF:65:7C:6A:69"
+        assert info.session_left == "8h59m39s"
+        assert info.bytes_left == "unlimited"
+        assert info.active
+        assert not info.limits_unassigned  # a bundle with a time limit is attached
+        assert info.source_url == "http://10.30.0.1/status"
+
+    def test_unrecognised_cards_do_not_become_fields(self) -> None:
+        html = CARD_HTML.replace(
+            "Active Username Code", "Amount paid"
+        ).replace("98:AF:65:7C:6A:69", "KES 50")
+        info = parse_mikrotik_status(html)
+        assert info.username is None
+        assert not info.active
+        assert info.session_left == "8h59m39s"
 
 
 class TestFetch:
