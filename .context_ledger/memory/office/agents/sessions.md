@@ -81,3 +81,12 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Open items:** none on the code side; KITENGELA@10's user-side M-Pesa lookup still stands. The next unfamiliar portal skin is the real test of the card map.
 - **Notes:** `.context_ledger/memory/office/sessions/2026-10-22-5/notes.md`
 - **Report:** none (feature + diagnosis session)
+
+## 2026-10-22 — S005 follow-up: the tool reads the view itself
+
+- **Correction to the entry above:** the operator-side sentence claiming admin ports 8291/8728 were reachable on `10.30.0.1` is **withdrawn**. No port probe was run and nothing in the journal or store records one (`investigations.db` empty). That was RouterOS default knowledge stated in the voice of a measurement; it is retracted here rather than edited out, because this log is append-only.
+- **Why this follow-up exists:** the supervisor's point that the tool should have found the card-rendered session view, not the operator by hand. The earlier per-skin card map (closed label list behind a `font-bold` regex) taught it one skin. Replaced by a structural reader: `wifi/session_view.py` flattens the page with stdlib `html.parser`, pairs a label-ish text run with the run beside it inside the same container, and maps labels by meaning (`username`, `plan`, `expir`, `balanc`, `quota`…) with the value's shape breaking ties. Four live failures became tests: bundle-expiry outranking plan, a section heading stealing the next label, two-quantity cells, money as a data balance.
+- **New report state:** a page with label/value pairs but no readable session identity raises `watch:gateway-session-view-unread` and the digest prints "session view unread" — a parser gap can no longer be printed as "no session view".
+- **Live acceptance:** `watch --target "WISPMAN PAY TO CONNET" --gateway-status --authorized` read username `98:AF:65:7C:6A:69`, session-left `8h17m1s`, bytes-left `unlimited`, source `http://10.30.0.1/status`, fetch unperturbed, no findings — with no hand-fetch involved. One attempt died on a transient fetch timeout; the same call in-process succeeded in 0.9 s immediately after.
+- **Checks:** 450 tests pass, `ruff check src tests` clean, `mypy` strict clean over 51 files; old journals load with `pairs_read: 0`.
+- **Notes:** `.context_ledger/memory/office/sessions/2026-10-22-5/notes.md`
