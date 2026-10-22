@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from threading import get_ident
 from typing import ClassVar
 
@@ -10,6 +11,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.timer import Timer
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
 
@@ -155,10 +157,21 @@ class WifiPickerApp(App[WifiNetwork | None]):
             self._latest_state = state
 
     def _render_state(self, state: WifiPickerState) -> None:
+        """Route a state update onto the mounted widgets.
+
+        A scan can finish while the picker is being torn down — the
+        refresh timer may fire one last time — so the widgets a render
+        needs can already be gone. The state is recorded either way; the
+        next mounted picker renders it.
+        """
+
         self._latest_state = state
-        status = self.query_one("#status", Static)
+        try:
+            status = self.query_one("#status", Static)
+            network_list = self.query_one("#networks", ListView)
+        except NoMatches:
+            return
         status.update(self._status_text(state))
-        network_list = self.query_one("#networks", ListView)
         if state.phase is WifiPickerPhase.SCANNING:
             # Keep existing rows visible while the replacement scan runs;
             # Textual mounts ListItems asynchronously. The rows are stale
@@ -180,7 +193,9 @@ class WifiPickerApp(App[WifiNetwork | None]):
             network_list.disabled = True
 
     def _render_error(self, message: str) -> None:
-        self.query_one("#status", Static).update(f"Error: {message}")
+        # Shutting down leaves no status line to write to.
+        with suppress(NoMatches):
+            self.query_one("#status", Static).update(f"Error: {message}")
 
     @staticmethod
     def _status_text(state: WifiPickerState) -> str:
