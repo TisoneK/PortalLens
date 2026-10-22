@@ -79,3 +79,32 @@ class TestMarkdownFindingsSection:
         assert "## Security Findings" in markdown
         assert "client_fingerprinting_preauth" in markdown
         assert "Recommended remediation" in markdown
+
+
+def _report_with_uncertainty(uncertainty: str):
+    """A real report whose first finding carries an uncertainty line."""
+
+    report = _report()
+    findings = list(report.findings)
+    findings[0] = findings[0].model_copy(update={"uncertainty": uncertainty})
+    return report.model_copy(update={"findings": findings}), findings[0].check_slug
+
+
+class TestUncertainty:
+    """A finding's own caveat travels into every rendered form."""
+
+    def test_markdown_prints_it_beside_the_impact(self) -> None:
+        from portallens.reporting import render_markdown
+
+        report, _ = _report_with_uncertainty("only two captures support this")
+        markdown = render_markdown(report)
+        assert "  - Uncertainty: only two captures support this" in markdown
+
+    def test_sarif_carries_it_as_a_property(self) -> None:
+        report, slug = _report_with_uncertainty("only two captures support this")
+        doc = json.loads(render_sarif(report))
+        run = doc["runs"][0]
+        result = next(r for r in run["results"] if r["ruleId"] == slug)
+        rule = next(r for r in run["tool"]["driver"]["rules"] if r["id"] == slug)
+        assert result["properties"]["uncertainty"] == "only two captures support this"
+        assert rule["properties"]["uncertainty"] == "only two captures support this"

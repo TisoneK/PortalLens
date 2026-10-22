@@ -423,3 +423,83 @@ class TestGatewayStatus:
         stored = json.loads(journal.read_text(encoding="utf-8"))
         assert stored["samples"][1]["epoch"] == 1
         assert stored["samples"][1]["gateway_session"] is None
+
+
+class TestReportShape:
+    """The digest is the default; --verbose restores the full history."""
+
+    def _patch_context(
+        self, monkeypatch: pytest.MonkeyPatch, *responses: CaptivePortalResponse
+    ) -> None:
+        _patch_detector(monkeypatch, _detector(*responses))
+        monkeypatch.setattr("portallens.cli._watch_snapshot", _fixture_snapshot)
+        monkeypatch.setattr(
+            "portallens.cli._gateway_status_fetch", lambda url, policy: _fixture_session()
+        )
+
+    def test_default_digest_omits_the_raw_history(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(monkeypatch, _unrestricted(), _unrestricted())
+        result = _watch(
+            CliRunner(), journal, "--target", "KITENGELA@10", "--gateway-status", "--authorized"
+        )
+        assert result.exit_code == 0, result.output
+        assert "## Verdict" in result.output
+        assert "Supporting evidence (grouped)" in result.output
+        assert "## Observations" not in result.output
+        assert "| # | Epoch | Observed at |" not in result.output
+
+    def test_verbose_restores_every_observation_and_evidence_row(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(monkeypatch, _unrestricted(), _unrestricted())
+        result = _watch(
+            CliRunner(),
+            journal,
+            "--target",
+            "KITENGELA@10",
+            "--gateway-status",
+            "--verbose",
+            "--authorized",
+        )
+        assert result.exit_code == 0, result.output
+        assert "## Observations" in result.output
+        assert "| # | Epoch | Observed at |" in result.output
+        assert "## Transitions" in result.output
+        assert "## Supporting evidence" in result.output
+        assert "gateway_session_without_plan" in result.output
+
+    def test_repeated_evidence_is_grouped_with_every_observation(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        runner = CliRunner()
+        self._patch_context(monkeypatch, _unrestricted(), _unrestricted())
+        first = _watch(
+            runner, journal, "--target", "KITENGELA@10", "--gateway-status", "--authorized"
+        )
+        assert first.exit_code == 0, first.output
+
+        self._patch_context(monkeypatch, _unrestricted(), _unrestricted())
+        second = _watch(runner, journal, "--gateway-status", "--authorized")
+        assert second.exit_code == 0, second.output
+
+        grouped = [
+            line
+            for line in second.output.splitlines()
+            if "watch:gateway-session-no-plan" in line
+        ]
+        assert len(grouped) == 1, second.output
+        assert "observation(s) 1, 2" in grouped[0]
+
+    def test_findings_carry_their_uncertainty(
+        self, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_context(monkeypatch, _unrestricted(), _unrestricted())
+        result = _watch(
+            CliRunner(), journal, "--target", "KITENGELA@10", "--gateway-status", "--authorized"
+        )
+        assert result.exit_code == 0, result.output
+        assert "- Uncertainty:" in result.output
+        assert "the status page's own wording" in result.output
+        assert "- Check: `gateway_session_without_plan`" in result.output

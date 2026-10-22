@@ -76,6 +76,7 @@ class SecurityCheck:
     provenance: Provenance = Provenance.DOCUMENTED
     confidence_weights: dict[str, int] = field(default_factory=dict)
     base_confidence: int = 70
+    uncertainty: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -273,10 +274,16 @@ GATEWAY_SESSION_WITHOUT_PLAN = SecurityCheck(
         "The gateway's own hotspot status page shows an active session for "
         "this device with no plan attached and every time/byte limit 'Not "
         "assigned'. Traffic is authorized with no purchased package enforcing "
-        "an end — the session persists until the gateway drops it, and the "
-        "user is never prompted to subscribe. On a paid hotspot this usually "
-        "means the billing integration created the session without applying "
-        "the purchased profile, or granted a profile-less session directly."
+        "an end — the session persists until the gateway drops it. On a paid "
+        "hotspot this usually means the billing integration created the "
+        "session without applying the purchased profile, or granted a "
+        "profile-less session directly."
+    ),
+    uncertainty=(
+        "'Not assigned' is the status page's own wording, footnoted with an "
+        "asterisk: it may mean no cap is enforced, or that this page does "
+        "not populate caps. What the gateway actually enforces is not "
+        "directly observable from the page."
     ),
     remediation=(
         "On the gateway, inspect the hotspot user behind the active session: "
@@ -308,6 +315,12 @@ SESSION_USERNAME_PAYMENT_CODE = SecurityCheck(
         "not a package, so nothing about it expires, and the enforcement "
         "question shifts entirely to whether a profile with limits was "
         "attached. This is a format inference, not a billing lookup."
+    ),
+    uncertainty=(
+        "The shape alone cannot say whose code it is, which billing system "
+        "issued it, or that it is a payment code at all — many unrelated "
+        "strings match. Only the operator's own records can tie the "
+        "username to a specific transaction."
     ),
     remediation=(
         "No gateway action is implied by the format alone. If the finding "
@@ -376,6 +389,7 @@ def run_checks(evidence: list[Evidence]) -> list[SecurityFinding]:
                 evidence_ids=[ev.id for ev in matches],
                 impact=check.impact,
                 remediation=check.remediation,
+                uncertainty=check.uncertainty,
                 verification_status=(
                     "validated against a captured URL in this repo's fixtures"
                     if verified

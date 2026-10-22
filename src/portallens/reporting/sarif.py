@@ -47,6 +47,8 @@ def _rule_for(finding: SecurityFinding) -> dict[str, Any]:
         "confidence": finding.confidence,
         "confidenceLabel": _label_for(finding.confidence).value,
     }
+    if finding.uncertainty:
+        properties["uncertainty"] = finding.uncertainty
     if finding.verification_status:
         properties["verificationStatus"] = finding.verification_status
     return {
@@ -72,6 +74,8 @@ def _result_for(finding: SecurityFinding, report: PortalReport) -> dict[str, Any
     }
     if finding.remediation:
         properties["remediation"] = finding.remediation
+    if finding.uncertainty:
+        properties["uncertainty"] = finding.uncertainty
     if finding.verification_status:
         properties["verificationStatus"] = finding.verification_status
     return {

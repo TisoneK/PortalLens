@@ -947,6 +947,16 @@ def _gateway_session_payload(session: GatewaySessionInfo | None) -> dict[str, ob
     show_default=True,
     help="Output format for the evaluated report.",
 )
+@click.option(
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help=(
+        "Print the full report — every observation, transition, and "
+        "evidence row. The default is the condensed digest; --format "
+        "json is always the complete machine-readable report."
+    ),
+)
 @_AUTHORIZED_OPTION
 def watch(
     profile_name: str,
@@ -959,6 +969,7 @@ def watch(
     target: str | None,
     journal_path: str | None,
     output_format: str,
+    verbose: bool,
     authorized: bool,
 ) -> None:
     """Observe access across a package expiry, one run per connection.
@@ -1068,7 +1079,7 @@ def watch(
     else:
         from portallens.reporting import render_watch_markdown
 
-        echo(render_watch_markdown(report))
+        echo(render_watch_markdown(report, verbose=verbose))
         echo(f"Journal: {path}", err=True)
 
 

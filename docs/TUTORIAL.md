@@ -535,9 +535,12 @@ and a sample means the access it covers is not flagged:
 portallens watch --target maz.wifi --renewal 2026-10-20T18:00 --authorized
 ```
 
-Each run prints the evaluated report: the observations, the transitions,
-the findings, and the evidence behind them. `--format json` prints the same
-thing for scripts. The journal lives at `$PORTALLENS_WATCH`, else
+Each run prints a condensed digest of the evaluated report: the verdict,
+the findings with the observation behind each one, what changed between
+runs, the latest gateway session view, and the evidence grouped by what it
+says rather than repeated once per sample. Add `--verbose` for the full
+report — every observation, every transition, every evidence row.
+`--format json` always prints the complete record, at full length. The journal lives at `$PORTALLENS_WATCH`, else
 `~/.local/share/portallens/watch.json`; `--journal PATH` picks another file.
 A journal is labelled with its target, and a run naming a different target
 is refused rather than mixing two networks' observations.

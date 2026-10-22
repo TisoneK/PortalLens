@@ -19,6 +19,7 @@ trace "why does this say 72%?" back to the raw inputs.
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from typing import Literal
 
@@ -70,6 +71,10 @@ class Evidence(BaseModel):
         The observed value, redacted if it could carry user data.
     note:
         Optional human-readable context.
+    observed_at:
+        When the observation was made, for evidence gathered over time
+        (watch samples). ``None`` for evidence that has no single moment
+        of observation, such as a value read off a pasted portal URL.
     """
 
     id: str = Field(default_factory=lambda: _next_evidence_id())
@@ -78,6 +83,7 @@ class Evidence(BaseModel):
     key: str
     value: str
     note: str | None = None
+    observed_at: datetime | None = None
 
 
 _observation_kind = Literal["fact", "inference", "hypothesis"]

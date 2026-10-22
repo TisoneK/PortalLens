@@ -705,7 +705,8 @@ def _watch_evidence(
         source=f"wifi-watch://{label}",
         key=key,
         value=value,
-        note=f"{note} Observed at {observed_at.isoformat()}.",
+        note=note,
+        observed_at=observed_at,
     )
 
 

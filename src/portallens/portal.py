@@ -68,6 +68,7 @@ class SecurityFinding(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
     impact: str | None = None
     remediation: str | None = None
+    uncertainty: str | None = None
     verification_status: str | None = None
     note: str | None = None
 

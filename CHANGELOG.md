@@ -14,10 +14,13 @@ All notable changes to PortalLens are listed here in plain language.
 - **Captive-portal detection.** PortalLens can read common connectivity checks and record response or redirect information without automatically opening a browser or following the redirect.
 - **Wi-Fi discovery across desktop systems.** PortalLens can list nearby networks using the operating system's available Wi-Fi tools on Windows, macOS, and Linux.
 - **Smoother Wi-Fi lists.** Selecting a network no longer crashes the setup screen, and nearby networks refresh automatically while the list remains safe to use during an update.
+- **A shorter watch report.** `portallens watch` now prints a digest by default: the verdict, each finding with the observation behind it, what changed between runs, the latest gateway session view, and evidence grouped by what it says instead of one row per sample. `--verbose` prints the full report — every observation, transition, and evidence row — and `--format json` always carries the complete record.
+- **Findings say what they cannot tell you.** A finding can now carry an uncertainty line next to its impact, so a check resting on ambiguous evidence says so in the report — for example, that the gateway's "Not assigned" limits are the status page's own wording, not proof that no cap is enforced.
 - **Watching access across a package expiry.** For investigators who suspect a paid hotspot keeps providing internet after a package expires, a new connectivity watch compares read-only connectivity probe results over time and across reconnects. When it observes verified internet access after a user-recorded package expiry — with no recorded renewal — it raises a finding with the supporting evidence trail. Available as a library API and as `portallens watch`, which keeps a journal so the history survives between runs; run it again with `--reconnect` after each real reconnect. `--portal` records what the portal itself showed, and a verified connection while the portal claims no package raises `portal_claim_mismatch` — the portal's view of the account and the gateway's authorization disagreeing.
 
 ### Changed
 
+- **Evidence records when it was observed.** Watch evidence now carries its observation time as data rather than folded into the note text, so identical rows from repeated fetches are recognised as the same finding instead of printed once per sample.
 - **The README is now a user guide.** It focuses on installing PortalLens, starting an investigation, and understanding the results. Technical development history belongs in the project records instead.
 - **The public changelog is now plain language.** It describes changes in terms of what users can do, without internal architecture labels or development-session notes.
 
