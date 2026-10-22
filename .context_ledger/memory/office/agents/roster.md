@@ -53,7 +53,7 @@ is your stable session tag.
 | Name | Codename | Model | Doing | Status | Status detail |
 |------|----------|-------|-------|--------|---------------|
 | Nadia | S002 | unknown (the harness does not expose a model id) | Dev environment bring-up: install the project's dependencies and verify the suite runs | Done | Shipped: `.venv` built and `pip install -e ".[dev]"` clean on Python 3.14.7; CLI runs, 378/378 tests pass |
-| Kwame | S003 | unknown (the harness does not expose a model id) | Watch report redesign: condensed verdict-first default (`--verbose` keeps full tables), provenance labels, dedupe, session-view changes, source-trust labels; no redaction per operator | Working | Checked in; reading checks.py and the renderer before rewriting |
+| Kwame | S003 | unknown (the harness does not expose a model id) | Watch report redesign: condensed verdict-first default (`--verbose` keeps full tables), provenance labels, dedupe, session-view changes, source-trust labels | Done | Shipped: ran out of tokens mid-slice; Amara (S005) finished and pushed it — `1c10fa0` digest + uncertainty end to end, 437 tests, ruff + mypy clean |
 
 **Keep your Status cells current — that is what the board is for.** The
 next live worker reads it to know at a glance what a peer has finished,

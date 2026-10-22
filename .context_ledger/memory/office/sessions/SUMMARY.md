@@ -30,3 +30,8 @@ records.
 - A removed summary line MUST have a corresponding permanent entry in
   agents/sessions.md — never delete the only record of a session.
 -->
+
+---
+- **2026-10-22 — Session 5** — Amara (S005) / deepseek-v4-flash — finished the abandoned watch-digest slice and analysed a newly joined paid hotspot.
+  A paid, MAC-keyed bundle is not an anomaly: `WISPMAN PAY TO CONNET` has a real time limit and unlimited data. Live defect worth remembering: `--gateway-status` reported "no session view" while one existed, because that operator renders the session as label/value cards; a "no session" line on a network serving one should be doubted, not believed.
+  Detail: `.context_ledger/memory/office/sessions/2026-10-22-5/notes.md`.
