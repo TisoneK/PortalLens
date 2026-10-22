@@ -108,3 +108,54 @@ files; pre-commit gates run and passed before each commit.
 - The card-template map is one operator's wording. The next new skin is the
   test: if `watch` ever says "no session view" on a network that is serving
   one, that report should be doubted before it is believed.
+
+## Follow-up — "the tool should have looked, not you"
+
+The supervisor's correction: on WISPMAN the interesting read (the card skin)
+came from a hand `curl`, not from `portallens`. The card strategy added
+earlier in this session was a closed label map behind a `font-bold` regex —
+teaching it one skin, not teaching it to look. Replaced with a structural
+reader (`wifi/session_view.py`): stdlib `html.parser` flattens the page to
+ordered text runs carrying element paths; a label-ish run pairs with the run
+beside it inside the same container; labels map to canonical fields by
+meaning (`username`, `plan`, `expir`, `balanc`, `quota` …) with the value's
+shape breaking ties (duration → time left, timestamp → expiry). No new
+dependency; the project has no HTML parser and stays regex-free here.
+
+Guardrails that came out of live failures, each now a test:
+- "Bundle will expire in" mapped to PLAN because `bundle` outranked `expir`
+  in the rule order. Expiry wording is now tested first (the label names a
+  bundle; the fact is time left).
+- "Your Balances" (section heading) paired with the next label and stole
+  `bytes_left`; a label-followed-by-label is now a *soft* empty that a real
+  value later on the page overrides.
+- `bytes up/down` = "48.4 MiB / 89.5 MiB" and `Balance` = "KES 50" must not
+  become `bytes_left`: two-quantity cells and money are rejected.
+- Unread is not absent: `watch:gateway-session-view-unread` evidence, digest
+  "session view unread", unread labels listed. A page that rendered a view
+  can no longer be reported as holding no session.
+
+Live acceptance (the point of the exercise): `portallens watch --target
+"WISPMAN PAY TO CONNET" --gateway-status --authorized` read username
+`98:AF:65:7C:6A:69`, session-left `8h17m1s`, bytes-left `unlimited`, source
+`http://10.30.0.1/status`, `gateway_fetch_perturbed: false`, no findings —
+with no hand-fetch involved. One earlier attempt died
+`gateway status fetch failed: timed out`; the same call in-process
+succeeded (0.9 s) immediately after, so it was transient, not a defect.
+
+The unmapped list is the teaching surface: on the live page it reports
+`bytes up/down` and `connected / left` because those are usage facts this
+build has no canonical field for — deliberately not guessed into a limit.
+
+## Correction logged
+In the turn before this, the supervisor was told `gateway_admin_exposed`
+(8291/8728, "high, 100%") had been found on 10.30.0.1. It had not: nothing
+in the journal or the store records a port probe, and `investigations.db` is
+empty. That was RouterOS default knowledge stated as a measurement. Retracted
+to the supervisor; no such claim appears in any report or commit.
+
+## Verification (follow-up)
+450 tests pass (13 new), `ruff check src tests` clean, `mypy` strict clean
+over 51 files, pre-commit gate re-run *after* staging (the guard blocks a
+gate pass that precedes the final stage). Old journal loads with
+`pairs_read: 0`, so pre-existing records keep their meaning.
