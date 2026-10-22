@@ -868,6 +868,12 @@ def _gateway_session_payload(session: GatewaySessionInfo | None) -> dict[str, ob
         "expires_on": session.expires_on,
         "bytes_left": session.bytes_left,
         "source_url": session.source_url,
+        "session_view": {
+            "pairs_read": session.view.pairs_read,
+            "unmapped": [
+                {"label": pair.label, "value": pair.value} for pair in session.view.unmapped
+            ],
+        },
     }
 
 

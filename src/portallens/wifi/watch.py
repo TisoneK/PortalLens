@@ -53,6 +53,7 @@ from portallens.wifi.local_snapshot import (
     snapshot_from_journal,
     snapshot_to_journal,
 )
+from portallens.wifi.session_view import LabelValue, SessionView
 
 
 class WatchSampleState(str, Enum):
@@ -165,6 +166,7 @@ _GATEWAY_SESSION_PAYMENT_CODE_KEY = "watch:gateway-session-username-payment-code
 _GATEWAY_STATUS_FETCH_KEY = "watch:gateway-status-fetch"
 _GATEWAY_STATUS_PERTURBATION_KEY = "watch:gateway-status-perturbation"
 _GATEWAY_STATUS_NO_SESSION_KEY = "watch:gateway-status-no-session"
+_GATEWAY_STATUS_UNREAD_KEY = "watch:gateway-session-view-unread"
 
 #: Claims that contradict verified internet access.
 _NO_PACKAGE_CLAIMS = frozenset({PortalClaim.PURCHASE_REQUIRED, PortalClaim.LOGIN_REQUIRED})
@@ -646,19 +648,42 @@ def _gateway_session_evidence(
                     )
                 )
         else:
-            evidence.append(
-                _watch_evidence(
-                    target,
-                    _GATEWAY_STATUS_NO_SESSION_KEY,
-                    "no_session_view",
-                    (
-                        "The gateway's status page carried no session view for "
-                        "this device — a login redirect, an empty shell, or no "
-                        "session held. The session fields are absent, not zero."
-                    ),
-                    observed_at=sample.observed_at,
+            if session.unread_view:
+                labels = ", ".join(
+                    f"{pair.label!r}"
+                    + (f" = {pair.value!r}" if pair.value else "")
+                    for pair in session.view.unmapped[:4]
                 )
-            )
+                evidence.append(
+                    _watch_evidence(
+                        target,
+                        _GATEWAY_STATUS_UNREAD_KEY,
+                        "unread_session_view",
+                        (
+                            "The gateway's status page rendered "
+                            f"{session.view.pairs_read} label/value pair(s) but none "
+                            "named a session user this build recognises"
+                            + (f" (labels: {labels})" if labels else "")
+                            + ". The view was found and not understood — a parser "
+                            "gap, not evidence that no session is held."
+                        ),
+                        observed_at=sample.observed_at,
+                    )
+                )
+            else:
+                evidence.append(
+                    _watch_evidence(
+                        target,
+                        _GATEWAY_STATUS_NO_SESSION_KEY,
+                        "no_session_view",
+                        (
+                            "The gateway's status page carried no session view for "
+                            "this device — a login redirect, an empty shell, or no "
+                            "session held. The session fields are absent, not zero."
+                        ),
+                        observed_at=sample.observed_at,
+                    )
+                )
         if sample.gateway_fetch_perturbed is True:
             evidence.append(
                 _watch_evidence(
@@ -778,6 +803,12 @@ def _session_to_journal(session: GatewaySessionInfo | None) -> dict[str, object]
         "expires_on": session.expires_on,
         "bytes_left": session.bytes_left,
         "source_url": session.source_url,
+        "session_view": {
+            "pairs_read": session.view.pairs_read,
+            "unmapped": [
+                {"label": pair.label, "value": pair.value} for pair in session.view.unmapped
+            ],
+        },
     }
 
 
@@ -796,6 +827,32 @@ def _journal_gateway_session(value: object) -> GatewaySessionInfo | None:
         expires_on=_optional_str(value.get("expires_on"), "gateway_session.expires_on"),
         bytes_left=_optional_str(value.get("bytes_left"), "gateway_session.bytes_left"),
         source_url=_optional_str(value.get("source_url"), "gateway_session.source_url") or "",
+        view=_journal_session_view(value.get("session_view")),
+    )
+
+
+def _journal_session_view(value: object) -> SessionView:
+    """Restore the structural scan; journals written before it simply lack one."""
+
+    if not isinstance(value, Mapping):
+        return SessionView()
+    pairs_read = value.get("pairs_read")
+    unmapped: list[LabelValue] = []
+    raw_unmapped = value.get("unmapped")
+    if isinstance(raw_unmapped, list):
+        for item in raw_unmapped:
+            if isinstance(item, Mapping):
+                label = _optional_str(item.get("label"), "gateway_session.session_view.label")
+                if label:
+                    unmapped.append(
+                        LabelValue(
+                            label,
+                            _optional_str(item.get("value"), "gateway_session.session_view.value"),
+                        )
+                    )
+    return SessionView(
+        pairs_read=pairs_read if isinstance(pairs_read, int) else 0,
+        unmapped=tuple(unmapped),
     )
 
 

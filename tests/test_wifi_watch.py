@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -10,6 +11,7 @@ from portallens.evidence import EvidenceType, reset_evidence_ids
 from portallens.wifi.captive_portal import CaptivePortalMetadata, CaptivePortalProbeResult
 from portallens.wifi.gateway_status import GatewaySessionInfo
 from portallens.wifi.local_snapshot import LocalNetworkSnapshot
+from portallens.wifi.session_view import LabelValue, SessionView
 from portallens.wifi.watch import (
     JOURNAL_VERSION,
     AccessWatchReport,
@@ -495,6 +497,99 @@ class TestGatewaySessionEvidence:
         assert "watch:gateway-status-fetch" in keys
         assert "watch:gateway-session-active" not in keys
         assert report.findings == ()
+
+    def test_unread_session_view_is_not_reported_as_absent(self) -> None:
+        """The live WISPMAN run: a view rendered, the parser read nothing.
+
+        Reporting that as "no session view" was the defect: it turned a
+        parser gap into evidence that the gateway held no session.
+        """
+        reset_evidence_ids()
+        watch = ConnectivityWatch()
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=GatewaySessionInfo(
+                username=None,
+                mac=None,
+                ip=None,
+                plan=None,
+                start_time=None,
+                session_left=None,
+                expires_on=None,
+                bytes_left=None,
+                source_url="http://10.30.0.1/status",
+                view=SessionView(
+                    pairs_read=2,
+                    unmapped=(LabelValue("Active Username Code", "98:AF:65:7C:6A:69"),),
+                ),
+            ),
+            gateway_fetch_perturbed=False,
+        )
+        report = watch.report()
+        keys = {e.key for e in report.evidence}
+        assert "watch:gateway-session-view-unread" in keys
+        assert "watch:gateway-status-no-session" not in keys
+        unread = next(e for e in report.evidence if e.key == "watch:gateway-session-view-unread")
+        assert "Active Username Code" in unread.note
+        assert "not understood" in unread.note
+
+    def test_journal_round_trips_the_structural_scan(self) -> None:
+        """A reloaded journal must still know the view was unread."""
+        watch = ConnectivityWatch(target="WISPMAN PAY TO CONNET")
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=GatewaySessionInfo(
+                username=None,
+                mac=None,
+                ip=None,
+                plan=None,
+                start_time=None,
+                session_left=None,
+                expires_on=None,
+                bytes_left=None,
+                source_url="http://10.30.0.1/status",
+                view=SessionView(
+                    pairs_read=3,
+                    unmapped=(LabelValue("Account", "WK-9921"),),
+                ),
+            ),
+        )
+        restored = ConnectivityWatch.from_journal(json.loads(json.dumps(watch.to_journal())))
+        session = restored.samples[0].gateway_session
+        assert session is not None
+        assert session.view.pairs_read == 3
+        assert session.view.unmapped[0].label == "Account"
+        assert session.unread_view
+
+    def test_report_calls_an_unread_view_unread(self) -> None:
+        from portallens.reporting import render_watch_markdown
+
+        watch = ConnectivityWatch()
+        watch.record(
+            _result(False),
+            at=T0,
+            gateway_session=GatewaySessionInfo(
+                username=None,
+                mac=None,
+                ip=None,
+                plan=None,
+                start_time=None,
+                session_left=None,
+                expires_on=None,
+                bytes_left=None,
+                source_url="http://10.30.0.1/status",
+                view=SessionView(
+                    pairs_read=2,
+                    unmapped=(LabelValue("Account", "WK-9921"),),
+                ),
+            ),
+            gateway_fetch_perturbed=False,
+        )
+        markdown = render_watch_markdown(watch.report())
+        assert "session view unread" in markdown
+        assert "no session view" not in markdown
 
     def test_empty_session_with_perturbation_records_both(self) -> None:
         reset_evidence_ids()

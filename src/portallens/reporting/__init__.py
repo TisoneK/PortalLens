@@ -412,6 +412,18 @@ def _render_watch_markdown_verbose(
             )
             lines.append(f"  - Limits: {limits}")
             lines.append(f"  - Source: {session.source_url or '(unknown)'}")
+            if session.unread_view:
+                pairs = ", ".join(
+                    f"{pair.label!r}" + (f" = {pair.value!r}" if pair.value else "")
+                    for pair in session.view.unmapped[:6]
+                )
+                lines.append(
+                    f"  - **The page rendered {session.view.pairs_read} label/value "
+                    "pair(s) but none named a session user this build recognises"
+                    + (f" ({pairs})" if pairs else "")
+                    + ". The session view was found and not read — a parser gap, "
+                    "not an absent session.**"
+                )
             if sample.gateway_fetch_perturbed is True:
                 lines.append(
                     "  - **The classification changed across this fetch — the "
@@ -656,6 +668,8 @@ def _session_view_change_lines(report: AccessWatchReport) -> list[str]:
             label, source = "no fetch", None
         elif session.active:
             label, source = "active session", session.source_url
+        elif session.unread_view:
+            label, source = "session view unread", session.source_url
         else:
             label, source = "no session view", session.source_url
         if label != prev_label:

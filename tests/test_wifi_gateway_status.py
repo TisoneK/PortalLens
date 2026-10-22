@@ -230,6 +230,117 @@ class TestCardTemplate:
         assert info.session_left == "8h59m39s"
 
 
+class TestUnfamiliarSkins:
+    """The reader reads structure, not one skin's class names.
+
+    Each fixture below is markup the previous per-skin regexes could not
+    have read: no ``<table>``, no ``font-bold`` class, different vocabulary,
+    and in the paired cases two quantities in one cell.
+    """
+
+    def test_plain_div_cards_parse_without_known_classes(self) -> None:
+        html = (
+            "<html><body><div class=\"box\">"
+            "<div class=\"k\">Username</div><div class=\"v\">wk-1</div></div>"
+            "<div class=\"box\"><div class=\"k\">Time left</div>"
+            "<div class=\"v\">2h13m</div></div>"
+            "<div class=\"box\"><div class=\"k\">Data quota</div>"
+            "<div class=\"v\">500 MiB</div></div></body></html>"
+        )
+        info = parse_mikrotik_status(html)
+        assert info.username == "wk-1"
+        assert info.session_left == "2h13m"
+        assert info.bytes_left == "500 MiB"
+        assert info.active
+
+    def test_definition_list_parses(self) -> None:
+        html = (
+            "<html><body><dl><dt>Username</dt><dd>wk-2</dd>"
+            "<dt>Expires on</dt><dd>2026-10-23 08:00:00</dd></dl></body></html>"
+        )
+        info = parse_mikrotik_status(html)
+        assert info.username == "wk-2"
+        assert info.expires_on == "2026-10-23 08:00:00"
+
+    def test_ambiguous_expiry_wording_uses_the_value_shape(self) -> None:
+        """\"Expiry\" alone: a duration is time left, a timestamp is a date."""
+        duration = parse_mikrotik_status(
+            "<html><body><div><span>Username</span><span>wk-3</span></div>"
+            "<div><span>Expiry</span><span>3 days</span></div></body></html>"
+        )
+        assert duration.session_left == "3 days"
+        assert duration.expires_on is None
+        stamp = parse_mikrotik_status(
+            "<html><body><div><span>Username</span><span>wk-4</span></div>"
+            "<div><span>Expiry</span><span>2026-10-23 08:00</span></div></body></html>"
+        )
+        assert stamp.expires_on == "2026-10-23 08:00"
+
+    def test_bundle_expiry_is_time_left_not_a_plan(self) -> None:
+        """Regression: \"Bundle will expire in\" once mapped onto PLAN."""
+        html = CARD_HTML.replace("Bundle will expire in", "Bundle will expire in")
+        info = parse_mikrotik_status(html)
+        assert info.plan is None
+        assert info.session_left == "8h59m39s"
+
+    def test_unread_view_is_not_an_absent_view(self) -> None:
+        """A view in unknown vocabulary must never read as \"no session\"."""
+        html = (
+            "<html><body><div class=\"tile\"><span>Account</span>"
+            "<span>WK-9921</span></div>"
+            "<div class=\"tile\"><span>Validity</span><span>3 days</span></div>"
+            "</body></html>"
+        )
+        info = parse_mikrotik_status(html)
+        assert not info.active
+        assert info.view.pairs_read == 2
+        assert info.view.found
+        assert info.unread_view  # found, but the identity label was unknown
+        assert ("Account", "WK-9921") in [(p.label, p.value) for p in info.view.unmapped]
+        # What it could read, it kept.
+        assert info.session_left == "3 days"
+
+    def test_absent_view_reports_no_pairs(self) -> None:
+        info = parse_mikrotik_status("<html><body>no session here</body></html>")
+        assert not info.view.found
+        assert not info.unread_view
+
+    def test_section_heading_does_not_steal_the_next_label(self) -> None:
+        html = (
+            "<html><body><div><p>Your Balances</p>"
+            "<div><span>Active Username Code</span><span>AA:BB:CC:DD:EE:FF</span></div>"
+            "<div><span>Data Balance</span><span>unlimited</span></div>"
+            "</div></body></html>"
+        )
+        info = parse_mikrotik_status(html)
+        assert info.username == "AA:BB:CC:DD:EE:FF"
+        assert info.bytes_left == "unlimited"
+
+    def test_money_is_not_a_data_balance(self) -> None:
+        html = (
+            "<html><body><div><span>Balance</span><span>KES 50</span></div>"
+            "</body></html>"
+        )
+        info = parse_mikrotik_status(html)
+        assert info.bytes_left is None
+
+    def test_two_quantities_in_one_cell_are_not_one_limit(self) -> None:
+        """\"bytes up/down\" is usage, not bytes remaining."""
+        html = (
+            "<html><body><div><span>Username</span><span>wk-5</span></div>"
+            "<div><span>bytes up/down</span><span>48.4 MiB / 89.5 MiB</span></div>"
+            "</body></html>"
+        )
+        info = parse_mikrotik_status(html)
+        assert info.bytes_left is None
+        assert info.username == "wk-5"
+
+    def test_flattened_paste_still_parses(self) -> None:
+        info = parse_mikrotik_status(STATUS_TEXT)
+        assert info.username == "UIBMX5SUY3"
+        assert info.limits_unassigned
+
+
 class TestFetch:
     def test_url_builder_targets_gateway_status_page(self) -> None:
         assert status_url_for_gateway("11.220.0.1") == "http://11.220.0.1/status"

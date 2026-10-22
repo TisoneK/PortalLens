@@ -603,6 +603,17 @@ session view came from. If only the shell could be read, the username
 degrades to the one the shell's iframe URL carries, with the remaining
 fields left unknown rather than invented.
 
+Session views are read structurally, not skin by skin. The page is
+flattened to label/value pairs whatever markup wraps them — RouterOS
+tables, billing-provider tables, Bootstrap cards, definition lists — and
+each label is mapped by meaning rather than by its exact wording, with the
+shape of the value breaking ties: a duration is time left, a timestamp is
+an expiry. When pairs are found but no session username can be named, the
+report says **session view unread** and lists the labels it saw. That is a
+gap in this build's vocabulary, never a statement that the gateway holds
+no session — the two states look alike on the page and mean opposite
+things.
+
 The session view feeds two checks. `gateway_session_without_plan` fires
 when the gateway shows an active session with no plan and every limit
 "not assigned" — the shape one old payment explains everything.
