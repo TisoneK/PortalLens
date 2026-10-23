@@ -91,3 +91,37 @@ sense if the operator states a fixed validity time.
 The tool's own report is the evidence: 2 observations, classification
 `unrestricted` x2, session view read by the tool (no hand-fetch), fetch
 unperturbed. Suite not run — no code touched.
+
+## Part 2 — the KITENGELA@10 voucher, confirmed (same day, continuation)
+
+Supervisor report on reconnecting: the portal said **"You have unused
+voucher UIBMX5SUY3"**; they clicked Connect and it worked. They also state
+**SMART WIFI@5 and KITENGELA@10 are the same network**.
+
+Recorded with the tool, same journal, fresh epoch (`--reconnect`,
+`--portal active_session`, note quoting the portal's message,
+`--gateway-status --authorized`). The run confirms both claims itself:
+
+- Local facts under the KITENGELA@10 journal: SSID `SMART WIFI@5`, client
+  `11.220.2.109`, gateway `11.220.0.1` (MikroTik) — the same gateway, same
+  client IP/MAC as every earlier KITENGELA@10 sample. Same billing backend
+  too (session view served from `asp.billnasi.com`). The alias is now
+  recorded in-band; future samples from either SSID belong in this journal.
+- Session view: username `UIBMX5SUY3`, device `98:AF:65:7C:6A:69`, plan
+  empty, all limits **Not assigned** — identical to 10-21.
+- Findings fired again: `gateway_session_without_plan` [medium, 100%
+  provisional] and `session_username_payment_code_shape` [low, 96%].
+
+**The session-3 hypothesis is confirmed.** Kwame's ~75% working explanation
+("a past payment created a hotspot user with no plan or limits, so it
+authorizes indefinitely") is now backed by the portal's own words: the
+voucher is *never consumed* — every session authorized from it carries no
+plan/limits, so nothing decrements it, so the portal keeps offering it as
+"unused" on every reconnect. One purchase, indefinite reuse. What remains
+unknown is the operator-side reason the profile/limits never attach
+(billing misconfiguration — not observable from the client), and the
+session-3 user-side item shrinks to dating the purchase (M-Pesa history).
+
+Contrast with WISPMAN (Part 1): two operators, two different modes —
+WISPMAN meters usage time on a *working* bundle; this billnasi operator
+grants a profile-less session that nothing ever drains.
