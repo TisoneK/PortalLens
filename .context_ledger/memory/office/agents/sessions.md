@@ -90,3 +90,15 @@ re-seeded into the new office explicitly, and nothing else carries over.
 - **Live acceptance:** `watch --target "WISPMAN PAY TO CONNET" --gateway-status --authorized` read username `98:AF:65:7C:6A:69`, session-left `8h17m1s`, bytes-left `unlimited`, source `http://10.30.0.1/status`, fetch unperturbed, no findings — with no hand-fetch involved. One attempt died on a transient fetch timeout; the same call in-process succeeded in 0.9 s immediately after.
 - **Checks:** 450 tests pass, `ruff check src tests` clean, `mypy` strict clean over 51 files; old journals load with `pairs_read: 0`.
 - **Notes:** `.context_ledger/memory/office/sessions/2026-10-22-5/notes.md`
+
+---
+
+## 2026-10-23 — Session 6
+- **Agent:** Tessa (S006) | **Model:** unknown (the harness does not expose a model id) | **Platform:** Tisone's Windows workstation (local) | **Role:** engineer | **Core:** 2.2.0
+- **Task:** Live question on `WISPMAN PAY TO CONNET`: the supervisor believed the bundle expired yesterday yet the machine still connects — run the tool, say whether the bundle is unlimited or what happened, and whether another user could reconnect the same way.
+- **Commits:** 1 (this closing ledger commit; no product code changed — the watch journal lives outside the repo)
+- **Outcome:** done — the gateway's own session view contradicts the expiry premise: bundle **still active, session-left 7h16m35s, data unlimited** (source `http://10.30.0.1/status`, fetch probe-bracketed and unperturbed). The countdown is **usage time, not wall clock**: between the two observations 14h28m of wall time consumed exactly 1h00m of bundle time — the deadline moved ~13.5h. Overnight the machine was away; this morning it re-joined on a fresh DHCP lease and the MAC-keyed session resumed with no code. "Still connecting" because the gateway still counts this MAC as authorized.
+- **Other users:** the mechanics (MAC-keyed session, MAC-cookie resume, meter pauses offline) apply to every customer by design — stretching a purchase across days is not an exploit. Someone else's device cannot consume this bundle without spoofing this MAC; no evidence of that.
+- **Open items:** none. Guidance recorded: do not arm `--expiry` on this target from "now + session-left" — a sliding usage-time deadline would fire false post-expiry findings on every sleep.
+- **Notes:** `.context_ledger/memory/office/sessions/2026-10-23-6/notes.md`
+- **Report:** none (diagnostic session — the tool's own watch report is the evidence)

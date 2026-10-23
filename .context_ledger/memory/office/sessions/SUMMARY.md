@@ -35,3 +35,8 @@ records.
 - **2026-10-22 — Session 5** — Amara (S005) / deepseek-v4-flash — finished the abandoned watch-digest slice and analysed a newly joined paid hotspot.
   A paid, MAC-keyed bundle is not an anomaly: `WISPMAN PAY TO CONNET` has a real time limit and unlimited data. Live defect worth remembering: `--gateway-status` reported "no session view" while one existed, because that operator renders the session as label/value cards; a "no session" line on a network serving one should be doubted, not believed.
   Detail: `.context_ledger/memory/office/sessions/2026-10-22-5/notes.md`.
+
+---
+- **2026-10-23 — Session 6** — Tessa (S006) / unknown — answered the live "expired yesterday but still connecting" question on `WISPMAN PAY TO CONNET`.
+  The bundle is not expired: gateway shows 7h16m left, data unlimited. The meter is **usage time, not wall clock** — 14.5h overnight consumed 1h of bundle; the MAC-keyed session resumed on this morning's re-join with no code. Never arm `--expiry` from "now + session-left" on a usage-metered operator.
+  Detail: `.context_ledger/memory/office/sessions/2026-10-23-6/notes.md`.
